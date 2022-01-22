@@ -422,7 +422,7 @@ function M.hide_ui()
 		end
 	end
 	M.options.ui_visible = false
-	api.nvim_set_current_win(M.options.restore_winid)
+	api.nvim_set_current_win(M.options.restore_winid or 0)
 end
 
 function M.delete_ui()
@@ -434,7 +434,7 @@ function M.delete_ui()
 	end
 	M.options.ui_visible = false
 	M.options.viewer_visible = false
-	api.nvim_set_current_win(M.options.restore_winid)
+	api.nvim_set_current_win(M.options.restore_winid or 0)
 end
 
 return M

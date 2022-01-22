@@ -70,7 +70,7 @@ function M.delete_ui(unmount, item)
 		M.menu:unmount()
 	end
 	M.options.ui_visible = false
-	api.nvim_set_current_win(M.options.restore_winid)
+	api.nvim_set_current_win(M.options.restore_winid or 0)
 	if item and M.options.send_data then
 		M.options.send_data(item)
 	end

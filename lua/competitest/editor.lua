@@ -146,7 +146,7 @@ function M.delete_ui(send_data)
 	M.popups.input_popup:unmount()
 	M.popups.output_popup:unmount()
 	M.options.ui_visible = false
-	api.nvim_set_current_win(M.options.restore_winid)
+	api.nvim_set_current_win(M.options.restore_winid or 0)
 end
 
 ---Start testcase editor with given testcase number
