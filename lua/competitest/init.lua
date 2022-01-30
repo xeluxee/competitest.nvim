@@ -78,23 +78,38 @@ local default_config = {
 	},
 	multiple_testing = -1, -- how many testcases to run at the same time. Set it to 0 to run all them together, -1 to use the number of available cpu cores, or any positive number to run how many testcases you want
 	maximum_time = 5000, -- maximum time (in milliseconds) given to a process. If it's excedeed process will be killed
+	output_compare_method = "squish", -- "exact", "squish" or custom function returning true if comparison is valid
 
 	input_name = "input",
 	output_name = "output",
 	-- $(INOUT) will be substituted with input_name or output_name content
 	testcases_files_format = "$(FNOEXT)_$(INOUT)$(TCNUM).txt",
+	testcases_use_single_file = false,
+	testcases_single_file_format = "$(FNOEXT).testcases",
 	testcases_directory = ".", -- where testcases are located, relatively to current file's path
-	testcases_compare_method = "squish", -- "exact", "squish" or custom function returning true if comparison is valid
 }
 
----Setup CompetiTest
----@param opts table: a table containing user configuration
-function M.setup(opts)
-	if M.current_setup == nil then
-		M.current_setup = default_config
-	end
-	if opts ~= nil then
-		local new_config = vim.tbl_deep_extend("force", M.current_setup, opts)
+---Return an updated configuration table with given options
+---@param cfg_tbl table | nil: configuration table to be updated
+---@param opts table | nil: table containing new options
+---@return table: table with updated configuration
+function M.update_config_table(cfg_tbl, opts)
+	-- local new_config = vim.deepcopy(cfg_tbl or default_config)
+	local new_config = cfg_tbl or default_config
+
+	if opts then
+		-- check deprecated options
+		if opts.testcases_compare_method then
+			opts.output_compare_method = opts.testcases_compare_method
+			opts.testcases_compare_method = nil
+			vim.defer_fn(function()
+				vim.notify(
+					"CompetiTest.nvim: option 'testcases_compare_method' has been deprecated in favour of 'output_compare_method'.",
+					vim.log.levels.WARN
+				)
+			end, 1000)
+		end
+		new_config = vim.tbl_deep_extend("force", new_config, opts)
 
 		-- commands arguments lists need to be replaced and not extended
 		for lang, cmd in pairs(opts.compile_command or {}) do
@@ -107,21 +122,31 @@ function M.setup(opts)
 				new_config.run_command[lang].args = cmd.args
 			end
 		end
-
-		M.current_setup = new_config
 	end
+	return new_config
+end
+
+---Setup CompetiTest
+---@param opts table: a table containing user configuration
+function M.setup(opts)
+	M.current_setup = M.update_config_table(M.current_setup, opts)
 
 	if not M.current_setup.loaded then
 		M.current_setup = vim.tbl_extend("force", M.current_setup, { loaded = true })
 
 		-- CompetiTest commands
 		vim.cmd([[
-    command! CompetiTestAdd lua require("competitest.commands").add_testcase()
-    command! -nargs=? CompetiTestEdit lua require("competitest.commands").edit_testcase(<f-args>)
-    command! -nargs=? CompetiTestDelete lua require("competitest.commands").delete_testcase(<f-args>)
+    function! s:convert_command_completion(...) abort
+      return "auto\nfiles_to_singlefile\nsinglefile_to_files"
+    endfunction
+
+    command! CompetiTestAdd lua require("competitest.commands").edit_testcase(true)
+    command! -nargs=? CompetiTestEdit lua require("competitest.commands").edit_testcase(false, <q-args>)
+    command! -nargs=? CompetiTestDelete lua require("competitest.commands").delete_testcase(<q-args>)
+    command! -nargs=1 -complete=custom,s:convert_command_completion CompetiTestConvert lua require("competitest.commands").convert_testcases(<q-args>)
     command! -nargs=* CompetiTestRun lua require("competitest.commands").run_testcases(<q-args>, true)
     command! -nargs=* CompetiTestRunNC lua require("competitest.commands").run_testcases(<q-args>, false)
-    command! CompetiTestRunNE lua require("competitest.commands").show_runner_ui()
+    command! CompetiTestRunNE lua require("competitest.runner_ui").show_ui()
     ]])
 
 		-- create highlight groups

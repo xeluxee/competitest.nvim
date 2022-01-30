@@ -1,6 +1,13 @@
 # competitest.nvim
 
-<h2 align="center">Competitive Programming with Neovim made Easy</h2>
+<div align="center">
+
+![Neovim](https://img.shields.io/badge/NeoVim-0.5+-%2357A143.svg?&style=for-the-badge&logo=neovim)
+![Lua](https://img.shields.io/badge/Lua-%232C2D72.svg?style=for-the-badge&logo=lua)
+![License](https://img.shields.io/github/license/xeluxee/competitest.nvim?style=for-the-badge&logo=gnu)
+
+<h2>Competitive Programming with Neovim made Easy</h2>
+</div>
 
 ![competitest](https://user-images.githubusercontent.com/88047141/149839002-280069e5-0c71-4aec-8e39-4443a1c44f5c.png)
 <!-- ![competitest](https://user-images.githubusercontent.com/88047141/147982101-2576e960-372c-4dec-b65e-97191c23a57d.png) -->
@@ -11,11 +18,13 @@
 - Multiple languages supported: it works out of the box with C, C++, Rust, Java and Python, but other languages can be [configured](#customize-compile-and-run-commands)
 - Flexible. No fixed folder structure or strict file-naming rules. You can choose where to put the source code file, the testcases, where to execute your programs and many more
 - Configurable (see [Configuration](#configuration)). You can even configure [every folder individually](#local-configuration)
+- Testcases can be stored in a single file or in multiple text files, see [usage notes](#usage-notes) 
 - [Add](#add-or-edit-a-testcase) testcases with `:CompetiTestAdd`
 - [Edit](#add-or-edit-a-testcase) a testcases with `:CompetiTestEdit`
 - [Delete](#remove-a-testcase) a testcase with `:CompetiTestDelete`
 - [Run](#run-testcases) your program across all the testcases with `:CompetiTestRun`, showing results and execution data in a nice interactive window
 - Customizable highlight groups. See [Highlights](#highlights)
+- Interface resizes automatically when Neovim window is resized
 
 ## Installation
 **NOTE:** this plugins requires Neovim ≥ 0.5
@@ -50,11 +59,22 @@ To see all the available settings see [configuration](#configuration).
 
 ### Usage notes
 - Your programs must read from `stdin` and print to `stdout`. If `stderr` is used its content will be displayed
-- Testcases are stored in text files. A testcase is made by an input file and an output file (containing the correct answer)
-- An input file is necessary for a testcase to be considered, while an output file hasn't to be provided necessarily
-- Files naming shall follow a rule to be recognized. Let's say your file is called `task-A.cpp`. If using the default configuration testcases associated with that file will be named `task-A_input0.txt`, `task-A_output0.txt`, `task-A_input1.txt`, `task-A_output1.txt` and so on. The counting starts from 0.\
+- A testcase is made by an input and an output (containing the correct answer)
+- Input is necessary for a testcase to be considered, while an output hasn't to be provided necessarily
+- Testcases can be stored in multiple text files or in a single [msgpack](https://msgpack.org/) encoded file. You can choose how to store them with `testcases_use_single_file` boolean option in in [configuration](#configuration). By default it's false, so multiple files are used\
+If you want to change the way already existing testcases are stored see [conversion](#convert-testcases)
+
+#### Storing testcases in multiple text files
+- To store testcases in multiple text files set `testcases_use_single_file` to false
+- Files naming shall follow a rule to be recognized. Let's say your file is called `task-A.cpp`. If using the default configuration testcases associated with that file will be named `task-A_input0.txt`, `task-A_output0.txt`, `task-A_input1.txt`, `task-A_output1.txt` and so on. The counting starts from 0\
 Of course files naming can be configured: see `testcases_files_format` in [configuration](#configuration)
-- Testcase files can be put in the same folder of the source code file, but you can customize testcases path (see `testcases_directory` in [configuration](#configuration)).
+- Testcases files can be put in the same folder of the source code file, but you can customize their path (see `testcases_directory` in [configuration](#configuration)).
+
+#### Storing testcases in a single file
+- To store testcases in a single file set `testcases_use_single_file` to true
+- Testcases file naming shall follow a rule to be recognized. Let's say your file is called `task-A.cpp`. If using the default configuration testcases file will be named `task-A.testcases`.
+Of course single file naming can be configured: see `testcases_single_file_format` in [configuration](#configuration)
+- Testcases file can be put in the same folder of the source code file, but you can customize its path (see `testcases_directory` in [configuration](#configuration)).
 
 Anyway you can forget about these rules if you use `:CompetiTestAdd` and `:CompetiTestEdit`, that handle these things for you.
 
@@ -70,6 +90,16 @@ Of course these keybindings can be customized: see `editor_ui` ➤ `normal_mode_
 
 ### Remove a testcase
 Launch `:CompetiTestDelete`. If you want to specify testcase number directly in the command line you can use `:CompetiTestDelete x`, where `x` is a number representing the testcase you want to remove.
+
+### Convert testcases
+Testcases can be stored in multiple text files or in a single [msgpack](https://msgpack.org/) encoded file.\
+Launch `:CompetiTestConvert` to change testcases storage method: you can convert a single file into multiple files or vice versa.
+One of the following arguments is needed:
+- `singlefile_to_files`: convert a single file into multiple text files
+- `files_to_singlefile`: convert multiple text files into a single file
+- `auto`: if there's a single file convert it into multiple files, otherwise convert multiple files into a single file
+
+**NOTE:** this command only converts already existing testcases files without changing CompetiTest configuration. To choose the storage method to use you have to [configure](#configuration) `testcases_use_single_file` option, that is false by default.
 
 ### Run testcases
 Launch `:CompetiTestRun`. CompetiTest's interface will appear and you'll be able to view details about a testcase by moving the cursor over its entry. You can close the UI by pressing `q` or `Q`.\
@@ -172,12 +202,14 @@ require('competitest').setup {
 	},
 	multiple_testing = -1,
 	maximum_time = 5000,
+	output_compare_method = "squish",
 
 	testcases_directory = ".",
 	input_name = "input",
 	output_name = "output",
 	testcases_files_format = "$(FNOEXT)_$(INOUT)$(TCNUM).txt",
-	testcases_compare_method = "squish",
+	testcases_use_single_file = false,
+	testcases_single_file_format = "$(FNOEXT).testcases",
 }
 ```
 
@@ -237,13 +269,15 @@ require('competitest').setup {
 - `input_name`: the string substituted to `$(INOUT)` (see [modifiers](#available-modifiers)), used to name input files
 - `output_name`: the string substituted to `$(INOUT)` (see [modifiers](#available-modifiers)), used to name output files
 - `testcases_files_format`: string representing how testcases files should be named (see [modifiers](#available-modifiers))
-- `testcases_compare_method`: how given output (stdout) and expected output should be compared. It can be a string, representing the method to use, or a custom function. Available options follows:
+- `testcases_use_single_file`: if true testcases will be stored in a single file instead of using multiple text files. If you want to change the way already existing testcases are stored see [conversion](#convert-testcases)
+- `testcases_single_file_format`: string representing how single testcases files should be named (see [modifiers](#available-modifiers))
+- `output_compare_method`: how given output (stdout) and expected output should be compared. It can be a string, representing the method to use, or a custom function. Available options follows:
 	- `"exact"`: character by character comparison
 	- `"squish"`: compare stripping extra white spaces and newlines
 	- custom function: you can use a function accepting two arguments, two strings representing output and expected output. It should return true if the given output is acceptable, false otherwise. Example:
 		``` lua
 		require('competitest').setup {
-			testcases_compare_method = function(output, expected_output)
+			output_compare_method = function(output, expected_output)
 				if output == expected_output then
 					return true
 				else

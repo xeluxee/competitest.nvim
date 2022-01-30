@@ -1,6 +1,6 @@
 local api = vim.api
 local luv = vim.loop
-local cgc = require("competitest.config").get_config
+local config = require("competitest.config")
 local compare = require("competitest.compare")
 local utils = require("competitest.utils")
 local ui = require("competitest.runner_ui")
@@ -30,15 +30,15 @@ function TCRunner:new(bufnr, restore_winid)
 		return { exec = exec, args = args }
 	end
 
-	local config = cgc(bufnr)
+	local buf_cfg = config.get_config(bufnr)
 	local this = {
-		config = config,
+		config = buf_cfg,
 		bufnr = bufnr,
-		cc = eval_command(config.compile_command[filetype]), -- compile command
-		rc = eval_command(config.run_command[filetype]), -- run command
-		compile_directory = filedir .. config.compile_directory .. "/",
-		running_directory = filedir .. config.running_directory .. "/",
-		testcase_directory = filedir .. config.testcases_directory .. "/",
+		cc = eval_command(buf_cfg.compile_command[filetype]), -- compile command
+		rc = eval_command(buf_cfg.run_command[filetype]), -- run command
+		compile_directory = filedir .. buf_cfg.compile_directory .. "/",
+		running_directory = filedir .. buf_cfg.running_directory .. "/",
+		testcase_directory = filedir .. buf_cfg.testcases_directory .. "/",
 		restore_winid = restore_winid,
 	}
 	if this.rc == nil then
@@ -74,18 +74,16 @@ function TCRunner:run_testcases(tctbl, compile)
 		if self.compile then -- if compilation is needed we add it as a testcase
 			table.insert(self.tcdata, { stdin = "", expout = nil, tcnum = "Compile" })
 		end
-		for tcnum, files in pairs(tctbl) do
-			if files.input then -- it makes no sense to consider a testcase without input
-				table.insert(self.tcdata, {
-					-- newline after stdin is needed, otherwise execution will get stuck in some cases
-					stdin = utils.load_file_as_string(self.testcase_directory .. files.input) .. "\n",
-					-- expout = expected output
-					expout = files.output and utils.load_file_as_string(self.testcase_directory .. files.output) or nil,
-					tcnum = tcnum,
-					timelimit = self.config.maximum_time,
-				})
-			end
-		end
+    for tcnum, tc in pairs(tctbl) do
+      table.insert(self.tcdata, {
+        -- newline after stdin is needed, otherwise execution will get stuck in some cases
+        stdin = tc.input .. "\n",
+        -- expout = expected output
+        expout = tc.output,
+        tcnum = tcnum,
+        timelimit = self.config.maximum_time,
+      })
+    end
 	end
 
 	-- reset running data
@@ -226,7 +224,7 @@ function TCRunner:execute_testcase(tcindex, exec, args, dir, callback)
 			if not tc.running and tc.status ~= "RUNNING" then
 				return
 			end
-			local correct = compare.compare_output(tc.stdout, tc.expout, self.config.testcases_compare_method)
+			local correct = compare.compare_output(tc.stdout, tc.expout, self.config.output_compare_method)
 			if correct == true then
 				tc.status = "CORRECT"
 				tc.hlgroup = "CompetiTestCorrect"

@@ -34,12 +34,14 @@ function M.compare_output(output, expected_output, method)
 		return nil
 	end
 
-	if type(method) == "string" then
+	if type(method) == "string" and M.methods[method] then
 		return M.methods[method](output, expected_output)
 	elseif type(method) == "function" then
 		return method(output, expected_output)
 	else
-		vim.notify("CompetiTest.nvim: compare_output: unrecognized method '" .. vim.inspect(method) .. "'", vim.log.levels.ERROR)
+		vim.schedule(function()
+			vim.notify("CompetiTest.nvim: compare_output: unrecognized method '" .. vim.inspect(method) .. "'", vim.log.levels.ERROR)
+		end)
 	end
 end
 

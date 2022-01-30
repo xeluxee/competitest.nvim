@@ -1,11 +1,7 @@
 local api = vim.api
 local nui_popup = require("nui.popup")
 local nui_event = require("nui.utils.autocmd").event
-local M = {}
-
-M.popups = {}
-M.options = {}
-M.tcdata = {}
+local M = { popups = {}, options = {}, tcdata = {} }
 
 function M.compute_layout()
 	local vim_width, vim_height = require("competitest.utils").get_ui_size()
@@ -406,13 +402,15 @@ M.update_ui = vim.schedule_wrap(function(tcdata, resized)
 end)
 
 function M.show_ui()
-	M.popups.so:show()
-	M.popups.eo:show()
-	M.popups.si:show()
-	M.popups.se:show()
-	M.popups.tc:show()
-	M.options.ui_visible = true
-	api.nvim_set_current_win(M.popups.tc.winid)
+  if not M.options.ui_visible and M.runner then
+    M.popups.so:show()
+    M.popups.eo:show()
+    M.popups.si:show()
+    M.popups.se:show()
+    M.popups.tc:show()
+    M.options.ui_visible = true
+    api.nvim_set_current_win(M.popups.tc.winid)
+  end
 end
 
 function M.hide_ui()

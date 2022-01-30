@@ -130,49 +130,23 @@ function M.delete_ui(send_data)
 		api.nvim_command("stopinsert")
 	end
 	if send_data ~= nil then
-		local function send_string(bufnr, datatype)
+		local function get_buf_text(bufnr)
 			local str = ""
 			local lines = api.nvim_buf_get_lines(bufnr, 0, -1, false)
 			for _, line in ipairs(lines) do
 				str = str .. line .. "\n"
 			end
-			str = string.sub(str, 0, -2)
-			send_data(datatype, str)
+			return string.sub(str, 0, -2)
 		end
-
-		send_string(M.popups.input_popup.bufnr, "input")
-		send_string(M.popups.output_popup.bufnr, "output")
+		send_data({
+			input = get_buf_text(M.popups.input_popup.bufnr),
+			output = get_buf_text(M.popups.output_popup.bufnr),
+		})
 	end
 	M.popups.input_popup:unmount()
 	M.popups.output_popup:unmount()
 	M.options.ui_visible = false
 	api.nvim_set_current_win(M.options.restore_winid or 0)
-end
-
----Start testcase editor with given testcase number
----@param bufnr integer: buffer number of source file
----@param tcnum integer: testcase number
----@param restore_winid integer | nil: bring the cursor to the given window after popups are closed
----@param warn boolean: when true warning messages are printed and execution is stopped if no input file is found
-function M.edit_testcase(bufnr, tcnum, restore_winid, warn)
-	local tc = utils.get_nth_testcase(bufnr, tcnum)
-	if warn and not tc.exists then
-		vim.notify("CompetiTest.nvim: edit_testcase: testcase " .. tcnum .. " doesn't exist!", vim.log.levels.ERROR)
-		return
-	end
-
-	local function save_data(datatype, content)
-		local file = datatype == "input" and tc.input_file or tc.output_file
-		if content == "" then
-			if utils.does_file_exists(file) then
-				utils.delete_file(file)
-			end
-			return
-		end
-		utils.write_string_on_file(file, content)
-	end
-
-	M.start_ui(bufnr, tcnum, tc.input, tc.output, save_data, restore_winid)
 end
 
 return M
