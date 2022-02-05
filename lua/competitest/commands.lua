@@ -1,6 +1,7 @@
 local config = require("competitest.config")
 local editor = require("competitest.editor")
 local picker = require("competitest.picker")
+local receive = require("competitest.receive")
 local runner = require("competitest.runner")
 local testcases = require("competitest.testcases")
 local M = {}
@@ -82,71 +83,71 @@ end
 ---Convert testcases from single file to multiple files and vice versa
 ---@param mode string: can be "singlefile_to_files", "files_to_singlefile" or "auto"
 function M.convert_testcases(mode)
-  local bufnr = vim.fn.bufnr()
-  local singlefile_tctbl = testcases.load_testcases_from_single_file(bufnr)
-  local no_singlefile = next(singlefile_tctbl) == nil
-  local files_tctbl = testcases.load_testcases_from_files(bufnr)
-  local no_files = next(files_tctbl) == nil
+	local bufnr = vim.fn.bufnr()
+	local singlefile_tctbl = testcases.load_testcases_from_single_file(bufnr)
+	local no_singlefile = next(singlefile_tctbl) == nil
+	local files_tctbl = testcases.load_testcases_from_files(bufnr)
+	local no_files = next(files_tctbl) == nil
 
-  local function convert_singlefile_to_files()
-    if no_singlefile then
-      vim.notify("CompetiTest.nvim: convert_testcases: there's no single file containing testcases.", vim.log.levels.ERROR)
-      return
-    end
-    if not no_files then
-      local choice = vim.fn.confirm("Testcases files already exist, by proceeding they will be replaced.", "&Proceed\n&Cancel")
-      if choice == 2 then
-        return
-      end -- user chose "Cancel"
-    end
+	local function convert_singlefile_to_files()
+		if no_singlefile then
+			vim.notify("CompetiTest.nvim: convert_testcases: there's no single file containing testcases.", vim.log.levels.ERROR)
+			return
+		end
+		if not no_files then
+			local choice = vim.fn.confirm("Testcases files already exist, by proceeding they will be replaced.", "&Proceed\n&Cancel")
+			if choice == 2 then
+				return
+			end -- user chose "Cancel"
+		end
 
-    for tcnum, _ in pairs(files_tctbl) do -- delete already existing files
-      testcases.write_testcase_on_files(bufnr, tcnum)
-    end
-    testcases.write_testcases_on_single_file(bufnr, {}) -- delete single file
-    for tcnum, tc in pairs(singlefile_tctbl) do -- create new files
-      testcases.write_testcase_on_files(bufnr, tcnum, tc.input, tc.output)
-    end
-  end
+		for tcnum, _ in pairs(files_tctbl) do -- delete already existing files
+			testcases.write_testcase_on_files(bufnr, tcnum)
+		end
+		testcases.write_testcases_on_single_file(bufnr, {}) -- delete single file
+		for tcnum, tc in pairs(singlefile_tctbl) do -- create new files
+			testcases.write_testcase_on_files(bufnr, tcnum, tc.input, tc.output)
+		end
+	end
 
-  local function convert_files_to_singlefile()
-    if no_files then
-      vim.notify("CompetiTest.nvim: convert_testcases: there are no files containing testcases.", vim.log.levels.ERROR)
-      return
-    end
-    if not no_singlefile then
-      local choice = vim.fn.confirm("Testcases single file already exists, by proceeding it will be replaced.", "&Proceed\n&Cancel")
-      if choice == 2 then
-        return
-      end -- user chose "Cancel"
-    end
+	local function convert_files_to_singlefile()
+		if no_files then
+			vim.notify("CompetiTest.nvim: convert_testcases: there are no files containing testcases.", vim.log.levels.ERROR)
+			return
+		end
+		if not no_singlefile then
+			local choice = vim.fn.confirm("Testcases single file already exists, by proceeding it will be replaced.", "&Proceed\n&Cancel")
+			if choice == 2 then
+				return
+			end -- user chose "Cancel"
+		end
 
-    for tcnum, _ in pairs(files_tctbl) do -- delete already existing files
-      testcases.write_testcase_on_files(bufnr, tcnum)
-    end
-    testcases.write_testcases_on_single_file(bufnr, files_tctbl) -- create new single file
-  end
+		for tcnum, _ in pairs(files_tctbl) do -- delete already existing files
+			testcases.write_testcase_on_files(bufnr, tcnum)
+		end
+		testcases.write_testcases_on_single_file(bufnr, files_tctbl) -- create new single file
+	end
 
-  if mode == "singlefile_to_files" then
-    convert_singlefile_to_files()
-  elseif mode == "files_to_singlefile" then
-    convert_files_to_singlefile()
-  elseif mode == "auto" then
-    if no_singlefile and no_files then
-      vim.notify("CompetiTest.nvim: convert_testcases: there's nothing to convert.", vim.log.levels.ERROR)
-    elseif not no_singlefile and not no_files then
-      vim.notify(
-        "CompetiTest.nvim: convert_testcases: single file and testcases files exist, please specifify what's to be converted.",
-        vim.log.levels.ERROR
-      )
-    elseif no_singlefile then
-      convert_files_to_singlefile()
-    else
-      convert_singlefile_to_files()
-    end
-  else
-    vim.notify("CompetiTest.nvim: convert_testcases: unrecognized mode '" .. tostring(mode) .. "'.", vim.log.levels.ERROR)
-  end
+	if mode == "singlefile_to_files" then
+		convert_singlefile_to_files()
+	elseif mode == "files_to_singlefile" then
+		convert_files_to_singlefile()
+	elseif mode == "auto" then
+		if no_singlefile and no_files then
+			vim.notify("CompetiTest.nvim: convert_testcases: there's nothing to convert.", vim.log.levels.ERROR)
+		elseif not no_singlefile and not no_files then
+			vim.notify(
+				"CompetiTest.nvim: convert_testcases: single file and testcases files exist, please specifify what's to be converted.",
+				vim.log.levels.ERROR
+			)
+		elseif no_singlefile then
+			convert_files_to_singlefile()
+		else
+			convert_singlefile_to_files()
+		end
+	else
+		vim.notify("CompetiTest.nvim: convert_testcases: unrecognized mode '" .. tostring(mode) .. "'.", vim.log.levels.ERROR)
+	end
 end
 
 ---Start testcases runner
@@ -172,10 +173,16 @@ function M.run_testcases(testcases_list, compile)
 	end
 
 	local r = runner:new(vim.fn.bufnr(), vim.api.nvim_get_current_win())
-  if r then
-    r:run_testcases(tctbl, compile)
-    r:show_ui()
-  end
+	if r then
+		r:run_testcases(tctbl, compile)
+		r:show_ui()
+	end
+end
+
+function M.receive_testcases()
+	local bufnr = vim.fn.bufnr()
+	config.load_buffer_config(bufnr)
+	receive.start_receiving(bufnr)
 end
 
 return M

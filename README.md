@@ -1,4 +1,4 @@
-# competitest.nvim
+# CompetiTest.nvim
 
 <div align="center">
 
@@ -23,6 +23,7 @@
 - [Edit](#add-or-edit-a-testcase) a testcases with `:CompetiTestEdit`
 - [Delete](#remove-a-testcase) a testcase with `:CompetiTestDelete`
 - [Run](#run-testcases) your program across all the testcases with `:CompetiTestRun`, showing results and execution data in a nice interactive window
+- [Download](#receive-testcases) testcases automatically from competitive programming platforms with `:CompetiTestReceive`
 - Customizable highlight groups. See [Highlights](#highlights)
 - Interface resizes automatically when Neovim window is resized
 
@@ -120,6 +121,13 @@ If you have previously closed the UI and you want to re-open it without re-execu
 
 Of course all these keybindings can be customized: see `runner_ui` ➤ `mappings` in [configuration](#configuration)
 
+### Receive testcases
+**NOTE:** to get this feature working you need to install [competitive-companion](https://github.com/jmerle/competitive-companion) extension in your browser.
+
+Launch `:CompetiTestReceive` to fetch testcases from competitive programming platforms. After launching this command click on the green plus button in your browser to download testcases: they will be received and stored automatically by CompetiTest.
+
+For further customization see `companion_port` and `receive_print_message` in [configuration](#configuration)
+
 ## Configuration
 ### Full configuration
 Here you can find CompetiTest default configuration
@@ -210,6 +218,9 @@ require('competitest').setup {
 	testcases_files_format = "$(FNOEXT)_$(INOUT)$(TCNUM).txt",
 	testcases_use_single_file = false,
 	testcases_single_file_format = "$(FNOEXT).testcases",
+
+	companion_port = 27121,
+	receive_print_message = true,
 }
 ```
 
@@ -286,6 +297,9 @@ require('competitest').setup {
 			end
 		}
 		```
+- `companion_port`: competitive companion port number
+- `receive_print_message`: if true notify user that plugin is ready to receive testcases or that testcases have just been received
+
 
 ### Local configuration
 You can use a different configuration for every different folder by creating a file called `.competitest.lua` (this name can be changed configuring the option `local_config_file_name`). It will affect every file contained in that folder and in subfolders. A table containing valid options must be returned, see the following example.
@@ -350,10 +364,10 @@ hi CompetiTestWrong   ctermfg=red    guifg=#ff0000
 ```
 
 ## Future plans
-- [ ] Write Vim docs
-- [ ] Integration with [competitive-companion](https://github.com/jmerle/competitive-companion) to download testcases and submit solutions
-- [ ] Add an option to use split window instead of popup
-- [ ] Handle interactive tasks
+- Write Vim docs
+- Find a way to submit solutions ([api-client](https://github.com/online-judge-tools/api-client) or [cpbooster](https://github.com/searleser97/cpbooster) or something else)
+- Add an option to use split window instead of popup
+- Handle interactive tasks
 
 ## Contributing
 If you have any suggestion to give or if you encounter any trouble don't hesitate to open a new issue.\

@@ -15,6 +15,10 @@ function M.start_ui(bufnr, tctbl, title, send_data, restore_winid)
 		end
 		M.delete_ui(true)
 	else
+		if next(tctbl) == nil then
+			vim.notify("CompetiTest.nvim: there's no testcase to pick from.", vim.log.levels.ERROR)
+			return
+		end
 		M.options.bufnr = bufnr or vim.fn.bufnr()
 		M.options.menu_items = {}
 		for tcnum, _ in pairs(tctbl) do

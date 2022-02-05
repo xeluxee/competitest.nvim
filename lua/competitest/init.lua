@@ -87,6 +87,9 @@ local default_config = {
 	testcases_use_single_file = false,
 	testcases_single_file_format = "$(FNOEXT).testcases",
 	testcases_directory = ".", -- where testcases are located, relatively to current file's path
+
+	companion_port = 27121, -- competitive companion port
+	receive_print_message = true,
 }
 
 ---Return an updated configuration table with given options
@@ -147,6 +150,7 @@ function M.setup(opts)
     command! -nargs=* CompetiTestRun lua require("competitest.commands").run_testcases(<q-args>, true)
     command! -nargs=* CompetiTestRunNC lua require("competitest.commands").run_testcases(<q-args>, false)
     command! CompetiTestRunNE lua require("competitest.runner_ui").show_ui()
+    command! CompetiTestReceive lua require("competitest.commands").receive_testcases()
     ]])
 
 		-- create highlight groups

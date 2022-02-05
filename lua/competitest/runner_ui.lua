@@ -402,15 +402,15 @@ M.update_ui = vim.schedule_wrap(function(tcdata, resized)
 end)
 
 function M.show_ui()
-  if not M.options.ui_visible and M.runner then
-    M.popups.so:show()
-    M.popups.eo:show()
-    M.popups.si:show()
-    M.popups.se:show()
-    M.popups.tc:show()
-    M.options.ui_visible = true
-    api.nvim_set_current_win(M.popups.tc.winid)
-  end
+	if not M.options.ui_visible and M.runner then
+		M.popups.so:show()
+		M.popups.eo:show()
+		M.popups.si:show()
+		M.popups.se:show()
+		M.popups.tc:show()
+		M.options.ui_visible = true
+		api.nvim_set_current_win(M.popups.tc.winid)
+	end
 end
 
 function M.hide_ui()

@@ -121,8 +121,8 @@ end
 ---Write a testcase on input and output file, or delete them if the specified content is empty
 ---@param bufnr integer: buffer number
 ---@param tcnum integer: testcase number
----@param input string: input content, or empty string to delete input file
----@param output string: output content, or empty string to delete output file
+---@param input string | nil: input content, or empty string or nil to delete input file
+---@param output string | nil: output content, or empty string or nil to delete output file
 function M.write_testcase_on_files(bufnr, tcnum, input, output)
 	local function update_file(fpath, content)
 		if not content or content == "" then

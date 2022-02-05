@@ -74,16 +74,16 @@ function TCRunner:run_testcases(tctbl, compile)
 		if self.compile then -- if compilation is needed we add it as a testcase
 			table.insert(self.tcdata, { stdin = "", expout = nil, tcnum = "Compile" })
 		end
-    for tcnum, tc in pairs(tctbl) do
-      table.insert(self.tcdata, {
-        -- newline after stdin is needed, otherwise execution will get stuck in some cases
-        stdin = tc.input .. "\n",
-        -- expout = expected output
-        expout = tc.output,
-        tcnum = tcnum,
-        timelimit = self.config.maximum_time,
-      })
-    end
+		for tcnum, tc in pairs(tctbl) do
+			table.insert(self.tcdata, {
+				-- newline after stdin is needed, otherwise execution will get stuck in some cases
+				stdin = tc.input .. "\n",
+				-- expout = expected output
+				expout = tc.output,
+				tcnum = tcnum,
+				timelimit = self.config.maximum_time,
+			})
+		end
 	end
 
 	-- reset running data
