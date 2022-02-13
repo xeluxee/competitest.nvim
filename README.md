@@ -363,11 +363,29 @@ hi CompetiTestWarning ctermfg=yellow guifg=orange
 hi CompetiTestWrong   ctermfg=red    guifg=#ff0000
 ```
 
-## Future plans
-- Write Vim docs
-- Find a way to submit solutions ([api-client](https://github.com/online-judge-tools/api-client) or [cpbooster](https://github.com/searleser97/cpbooster) or something else)
-- Add an option to use split window instead of popup
-- Handle interactive tasks
+## Roadmap
+- [x] Manage testcases
+	- [x] Add testcases
+	- [x] Edit testcases
+	- [x] Delete testcases
+	- [x] Store testcases in a single file
+	- [x] Store testcases in multiple text files
+	- [x] Convert single file into multiple text files and vice versa
+- [x] Run testcases
+	- [x] Support many programming languages
+	- [x] Handle compilation if needed
+	- [x] Run multiple testcases at the same time
+		- [x] Run again processes
+		- [x] Kill processes
+	- [x] Display results and execution data in a popup
+	- [ ] Display results and execution data in a split window
+	- [ ] Handle interactive tasks
+- [x] Configure every folder individually
+- [x] Integration with [competitive-companion](https://github.com/jmerle/competitive-companion) to download testcases automatically from competitive programming platforms
+- [ ] Integration with tools to submit solutions ([api-client](https://github.com/online-judge-tools/api-client) or [cpbooster](https://github.com/searleser97/cpbooster))
+- [ ] Write Vim docs
+- [x] Customizable highlights
+- [x] Resizable UI
 
 ## Contributing
 If you have any suggestion to give or if you encounter any trouble don't hesitate to open a new issue.\

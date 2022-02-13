@@ -48,8 +48,12 @@ function M.load_testcases_from_files(bufnr)
 		return tonumber(value)
 	end
 
+	local dir = luv.fs_opendir(tcdir)
+	if not dir then
+		return {}
+	end
+
 	local tcs = {} -- testcases
-	local dir = assert(luv.fs_opendir(tcdir), "CompetiTest.nvim: get_testcases: cannot open directory '" .. tcdir .. "'")
 	while true do -- read all the files in directory
 		local entry = luv.fs_readdir(dir)
 		if entry == nil then

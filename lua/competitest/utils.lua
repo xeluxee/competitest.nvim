@@ -133,10 +133,24 @@ function M.load_file_as_string(filepath)
 	return string.gsub(content, "\r\n", "\n") -- convert CRLF to LF
 end
 
+---Create the specified directory if it doesn't exist
+---@param dirpath string: directory absolute path
+function M.create_directory(dirpath)
+	if not luv.fs_opendir(dirpath) then
+		dirpath = string.gsub(dirpath, "[/\\]+$", "") -- trim trailing slashes
+		local upper_dir = vim.fn.fnamemodify(dirpath, ":h")
+		if upper_dir ~= dirpath then
+			M.create_directory(upper_dir)
+		end
+		assert(luv.fs_mkdir(dirpath, 493), "CompetiTest.nvim: create_directory: cannot create directory '" .. dirpath .. "'")
+	end
+end
+
 ---Write the content of the given string on a file
 ---@param filepath string
 ---@param content string
 function M.write_string_on_file(filepath, content)
+	M.create_directory(vim.fn.fnamemodify(filepath, ":h"))
 	local fd = assert(luv.fs_open(filepath, "w", 420), "CompetiTest.nvim: write_string_on_file: cannot open file '" .. filepath .. "'")
 	assert(luv.fs_write(fd, content, 0), "CompetiTest.nvim: write_string_on_file: cannot write on file '" .. filepath .. "'")
 	assert(luv.fs_close(fd), "CompetiTest.nvim: write_string_on_file: unable to close '" .. filepath .. "'")

@@ -160,6 +160,7 @@ function TCRunner:execute_testcase(tcindex, exec, args, dir, callback)
 	}
 	local tc = self.tcdata[tcindex]
 
+	utils.create_directory(dir)
 	process.handle, process.pid = luv.spawn(process.exec, {
 		args = process.args,
 		cwd = dir,
