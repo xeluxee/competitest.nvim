@@ -19,7 +19,7 @@ function M.load_buffer_config(bufnr)
 		if utils.does_file_exists(config_file) then
 			local_config = dofile(config_file)
 			if type(local_config) ~= "table" then
-				vim.notify("CompetiTest.nvim: load_buffer_config: '" .. config_file .. "' doesn't return a table.", vim.log.levels.ERROR)
+				utils.notify("load_buffer_config: '" .. config_file .. "' doesn't return a table.")
 			end
 		end
 		dir = vim.fn.fnamemodify(dir, ":h")

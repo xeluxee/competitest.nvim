@@ -4,6 +4,7 @@ local picker = require("competitest.picker")
 local receive = require("competitest.receive")
 local runner = require("competitest.runner")
 local testcases = require("competitest.testcases")
+local utils = require("competitest.utils")
 local M = {}
 
 ---Start testcase editor to add a new testcase or to edit a testcase that already exists
@@ -23,7 +24,7 @@ function M.edit_testcase(add_testcase, tcnum)
 
 	local function start_editor(item) -- item.id is testcase number
 		if not tctbl[item.id] then
-			vim.notify("CompetiTest.nvim: edit_testcase: testcase " .. tostring(item.id or tcnum) .. " doesn't exist!", vim.log.levels.ERROR)
+			utils.notify("edit_testcase: testcase " .. tostring(item.id or tcnum) .. " doesn't exist!")
 			return
 		end
 		tcnum = item.id
@@ -55,7 +56,7 @@ function M.delete_testcase(tcnum)
 
 	local function delete_testcase(item) -- item.id is testcase number
 		if not tctbl[item.id] then
-			vim.notify("CompetiTest.nvim: delete_testcase: testcase " .. tostring(item.id or tcnum) .. " doesn't exist!", vim.log.levels.ERROR)
+			utils.notify("delete_testcase: testcase " .. tostring(item.id or tcnum) .. " doesn't exist!")
 			return
 		end
 		tcnum = item.id
@@ -91,7 +92,7 @@ function M.convert_testcases(mode)
 
 	local function convert_singlefile_to_files()
 		if no_singlefile then
-			vim.notify("CompetiTest.nvim: convert_testcases: there's no single file containing testcases.", vim.log.levels.ERROR)
+			utils.notify("convert_testcases: there's no single file containing testcases.")
 			return
 		end
 		if not no_files then
@@ -112,7 +113,7 @@ function M.convert_testcases(mode)
 
 	local function convert_files_to_singlefile()
 		if no_files then
-			vim.notify("CompetiTest.nvim: convert_testcases: there are no files containing testcases.", vim.log.levels.ERROR)
+			utils.notify("convert_testcases: there are no files containing testcases.")
 			return
 		end
 		if not no_singlefile then
@@ -134,19 +135,16 @@ function M.convert_testcases(mode)
 		convert_files_to_singlefile()
 	elseif mode == "auto" then
 		if no_singlefile and no_files then
-			vim.notify("CompetiTest.nvim: convert_testcases: there's nothing to convert.", vim.log.levels.ERROR)
+			utils.notify("convert_testcases: there's nothing to convert.")
 		elseif not no_singlefile and not no_files then
-			vim.notify(
-				"CompetiTest.nvim: convert_testcases: single file and testcases files exist, please specifify what's to be converted.",
-				vim.log.levels.ERROR
-			)
+			utils.notify("convert_testcases: single file and testcases files exist, please specifify what's to be converted.")
 		elseif no_singlefile then
 			convert_files_to_singlefile()
 		else
 			convert_singlefile_to_files()
 		end
 	else
-		vim.notify("CompetiTest.nvim: convert_testcases: unrecognized mode '" .. tostring(mode) .. "'.", vim.log.levels.ERROR)
+		utils.notify("convert_testcases: unrecognized mode '" .. tostring(mode) .. "'.")
 	end
 end
 
@@ -166,7 +164,7 @@ function M.run_testcases(testcases_list, compile)
 			if tctbl[tcnum] then
 				new_tctbl[tcnum] = tctbl[tcnum]
 			else
-				vim.notify("CompetiTest.nvim: run_testcases: testcase " .. tcnum .. " doesn't exist!", vim.log.levels.ERROR)
+				utils.notify("run_testcases: testcase " .. tcnum .. " doesn't exist!")
 			end
 		end
 		tctbl = new_tctbl

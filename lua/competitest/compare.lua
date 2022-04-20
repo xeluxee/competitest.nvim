@@ -1,3 +1,4 @@
+local utils = require("competitest.utils")
 local M = {}
 
 -- Methods to determine if result is correct
@@ -40,7 +41,7 @@ function M.compare_output(output, expected_output, method)
 		return method(output, expected_output)
 	else
 		vim.schedule(function()
-			vim.notify("CompetiTest.nvim: compare_output: unrecognized method '" .. vim.inspect(method) .. "'", vim.log.levels.ERROR)
+			utils.notify("compare_output: unrecognized method '" .. vim.inspect(method) .. "'")
 		end)
 	end
 end

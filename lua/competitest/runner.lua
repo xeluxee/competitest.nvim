@@ -42,10 +42,7 @@ function TCRunner:new(bufnr, restore_winid)
 		restore_winid = restore_winid,
 	}
 	if this.rc == nil then
-		vim.notify(
-			"CompetiTest.nvim: TCRunner:new: run command for filetype '" .. filetype .. "' isn't configured properly.\nCannot proceed.",
-			vim.log.levels.ERROR
-		)
+		utils.notify("TCRunner:new: run command for filetype '" .. filetype .. "' isn't configured properly.\nCannot proceed.")
 		return nil
 	end
 
@@ -204,10 +201,7 @@ function TCRunner:execute_testcase(tcindex, exec, args, dir, callback)
 		end
 	end)
 	if not process.handle then
-		vim.notify(
-			"CompetiTest.nvim: TCRunner:execute_testcase: failed to spawn process using '" .. process.exec .. "' (" .. process.pid .. ").",
-			vim.log.levels.ERROR
-		)
+		utils.notify("TCRunner:execute_testcase: failed to spawn process using '" .. process.exec .. "' (" .. process.pid .. ").")
 		tc.status = "FAILED"
 		tc.hlgroup = "CompetiTestWarning"
 		tc.time = -1

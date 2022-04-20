@@ -58,6 +58,13 @@ M.modifiers = {
 	["INOUT"] = nil,
 }
 
+---Show a CompetiTest notification with vim.notify
+---@param msg string: message to display
+---@param log_level string | nil: a log level among the ones available in vim.log.levels. When nil it defaults to ERROR
+function M.notify(msg, log_level)
+	vim.notify("CompetiTest.nvim: " .. msg, vim.log.levels[log_level or "ERROR"], { title = "CompetiTest" })
+end
+
 ---Convert a string with dollars into a real string
 ---@param str string: the string to evaluate
 ---@param tcnum integer | string: test case number or identifier
@@ -77,7 +84,7 @@ function M.eval_string(str, tcnum, inout, bufnr)
 			if c == "(" then
 				mod_start = i
 			else
-				vim.notify("CompetiTest.nvim: eval_string: '$' isn't followed by '(' in the following string!\n" .. str, vim.log.levels.ERROR)
+				M.notify("eval_string: '$' isn't followed by '(' in the following string!\n" .. str)
 				return nil
 			end
 		elseif mod_start == 0 then
@@ -94,7 +101,7 @@ function M.eval_string(str, tcnum, inout, bufnr)
 			elseif type(rep) == "function" then
 				evaluated_str = evaluated_str .. vim.api.nvim_buf_call(bufnr, rep)
 			else
-				vim.notify("CompetiTest.nvim: eval_string: unrecognized modifier $(" .. mod .. ")", vim.log.levels.ERROR)
+				M.notify("eval_string: unrecognized modifier $(" .. mod .. ")")
 				return nil
 			end
 			mod_start = 0

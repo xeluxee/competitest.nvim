@@ -101,19 +101,7 @@ function M.update_config_table(cfg_tbl, opts)
 	local new_config = cfg_tbl or default_config
 
 	if opts then
-		-- check deprecated options
-		if opts.testcases_compare_method then
-			opts.output_compare_method = opts.testcases_compare_method
-			opts.testcases_compare_method = nil
-			vim.defer_fn(function()
-				vim.notify(
-					"CompetiTest.nvim: option 'testcases_compare_method' has been deprecated in favour of 'output_compare_method'.",
-					vim.log.levels.WARN
-				)
-			end, 1000)
-		end
 		new_config = vim.tbl_deep_extend("force", new_config, opts)
-
 		-- commands arguments lists need to be replaced and not extended
 		for lang, cmd in pairs(opts.compile_command or {}) do
 			if cmd.args then

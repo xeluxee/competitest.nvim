@@ -28,9 +28,15 @@ end
 ---@return table: a table of tables made by two strings, input and output
 function M.load_testcases_from_files(bufnr)
 	local cfg = cgc(bufnr)
-	local tcdir = M.get_testcases_path(bufnr)
-	local input_match = "^" .. utils.eval_string(cfg.testcases_files_format, "(%d+)", cfg.input_name, bufnr) .. "$"
-	local output_match = "^" .. utils.eval_string(cfg.testcases_files_format, "(%d+)", cfg.output_name, bufnr) .. "$"
+
+	local function compute_match(inout)
+		local match = utils.eval_string(cfg.testcases_files_format, "(%d+)", inout, bufnr)
+		match = match:gsub("([^%w])", "%%%1") -- escape pattern magic characters
+		match = match:gsub("%%%(%%%%d%%%+%%%)", "(%%d+)") -- restore (%d+) for testcase number matching
+		return "^" .. match .. "$"
+	end
+	local input_match = compute_match(cfg.input_name)
+	local output_match = compute_match(cfg.output_name)
 
 	---The following function checks if a file belongs to a testcase, and if true returns testcase number
 	---It finds all the matches in str, checks if they are all equal and return their value
@@ -48,6 +54,7 @@ function M.load_testcases_from_files(bufnr)
 		return tonumber(value)
 	end
 
+	local tcdir = M.get_testcases_path(bufnr)
 	local dir = luv.fs_opendir(tcdir)
 	if not dir then
 		return {}

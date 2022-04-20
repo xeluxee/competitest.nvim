@@ -16,7 +16,7 @@ function M.start_ui(bufnr, tctbl, title, send_data, restore_winid)
 		M.delete_ui(true)
 	else
 		if next(tctbl) == nil then
-			vim.notify("CompetiTest.nvim: there's no testcase to pick from.", vim.log.levels.ERROR)
+			utils.notify("there's no testcase to pick from.")
 			return
 		end
 		M.options.bufnr = bufnr or vim.fn.bufnr()

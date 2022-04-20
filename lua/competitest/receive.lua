@@ -1,6 +1,7 @@
 local luv = vim.loop
 local cgc = require("competitest.config").get_config
 local testcases = require("competitest.testcases")
+local utils = require("competitest.utils")
 local M = {}
 
 ---Start waiting for competitive companion to send task data and save received testcases
@@ -28,7 +29,7 @@ function M.start_receiving(bufnr)
 
 				vim.schedule(function()
 					if cfg.receive_print_message then
-						vim.notify("CompetiTest.nvim: testcases received successfully!", vim.log.levels.INFO)
+						utils.notify("testcases received successfully!", "INFO")
 					end
 					M.store_testcases(bufnr, task.tests, cfg.testcases_use_single_file)
 				end)
@@ -43,7 +44,7 @@ function M.start_receiving(bufnr)
 	end)
 
 	if cfg.receive_print_message then
-		vim.notify("CompetiTest.nvim: ready to receive testcases. Press the green plus button in your browser.", vim.log.levels.INFO)
+		utils.notify("ready to receive testcases. Press the green plus button in your browser.", "INFO")
 	end
 end
 
