@@ -142,23 +142,41 @@ function M.setup(opts)
 		cmd("CompetiTestConvert", function(info)
 			require("competitest.commands").convert_testcases(info.args)
 		end, {
-			nargs = 1,
+			nargs = "+",
 			complete = function()
 				return { "auto", "files_to_singlefile", "singlefile_to_files" }
 			end
 		})
 		cmd("CompetiTestRun", function(info)
 			require("competitest.commands").run_testcases(info.args, true)
-		end)
+		end, {
+			nargs = "*"
+		})
 		cmd("CompetiTestRunNC", function(info)
 			require("competitest.commands").run_testcases(info.args, false)
-		end)
+		end, {
+			nargs = "*"
+		})
 		cmd("CompetiTestRunNE", function()
 			require("competitest.runner_ui").show_ui()
 		end)
 		cmd("CompetiTestReceive", function()
 			require("competitest.commands").receive_testcases()
 		end)
+
+		-- Needs refactor
+		cmd("CompetiTest", function(info)
+			require("competitest.commands").edit_testcase(true)
+		end, {
+			nargs = "+",
+			complete = function(ArgLead, CmdLine, CursorPos)
+				if CmdLine == "CompetiTest convert " then
+					return { "auto", "files_to_singlefile", "singlefile_to_files" }
+				end
+				return {"add", "edit", "delete", "convert", "run", "runNC", "receive"}
+			end
+		})
+
 
 		-- create highlight groups
 		M.setup_highlight_groups()
