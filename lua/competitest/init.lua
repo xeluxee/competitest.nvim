@@ -67,6 +67,7 @@ local default_config = {
 			order = {1, 2, 3, 4}, -- errors, input, output, expected output
 		},
 	},
+	default_layout = 2,
 
 	save_current_file = true,
 	save_all_files = false,
