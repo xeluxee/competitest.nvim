@@ -59,6 +59,15 @@ local default_config = {
 		},
 	},
 
+	layouts = {
+		floating = {},
+		default = {
+			cmd = "set nosplitright | vs | setl wfw | wincmd w | bel sp | vs | vs | 1wincmd w",
+			order = {1, 2, 3, 4, 5}, -- source, errors, input, output, expected output
+		},
+	},
+	default_layout = "default",
+
 	save_current_file = true,
 	save_all_files = false,
 	compile_directory = ".", -- working directory of compile_command, relatively to current file's path
@@ -126,27 +135,63 @@ function M.setup(opts)
 		M.current_setup = vim.tbl_extend("force", M.current_setup, { loaded = true })
 
 		-- CompetiTest commands
-		vim.cmd([[
-    function! s:convert_command_completion(...) abort
-      return "auto\nfiles_to_singlefile\nsinglefile_to_files"
-    endfunction
+		local function cmd(lhs, fun, opt)
+			vim.api.nvim_create_user_command(lhs, fun, opt or {})
+		end
 
-    command! CompetiTestAdd lua require("competitest.commands").edit_testcase(true)
-    command! -nargs=? CompetiTestEdit lua require("competitest.commands").edit_testcase(false, <q-args>)
-    command! -nargs=? CompetiTestDelete lua require("competitest.commands").delete_testcase(<q-args>)
-    command! -nargs=1 -complete=custom,s:convert_command_completion CompetiTestConvert lua require("competitest.commands").convert_testcases(<q-args>)
-    command! -nargs=* CompetiTestRun lua require("competitest.commands").run_testcases(<q-args>, true)
-    command! -nargs=* CompetiTestRunNC lua require("competitest.commands").run_testcases(<q-args>, false)
-    command! CompetiTestRunNE lua require("competitest.runner_ui").show_ui()
-    command! CompetiTestReceive lua require("competitest.commands").receive_testcases()
-    ]])
+		cmd("CompetiTestAdd", function()
+			require("competitest.commands").edit_testcase(true)
+		end)
+		cmd("CompetiTestEdit", function(info)
+			require("competitest.commands").edit_testcase(false, info.args)
+		end, { nargs = "?" })
+		cmd("CompetiTestDelete", function(info)
+			require("competitest.commands").delete_testcase(info.args)
+		end, { nargs = "?" })
+		cmd("CompetiTestConvert", function(info)
+			require("competitest.commands").convert_testcases(info.args)
+		end, {
+			nargs = 1,
+			complete = function()
+				return { "auto", "files_to_singlefile", "singlefile_to_files" }
+			end
+		})
+		cmd("CompetiTestRun", function(info)
+			require("competitest.commands").run_testcases(info.args, true)
+		end)
+		cmd("CompetiTestRunNC", function(info)
+			require("competitest.commands").run_testcases(info.args, false)
+		end)
+		cmd("CompetiTestRunNE", function()
+			require("competitest.runner_ui").show_ui()
+		end)
+		cmd("CompetiTestLayout", function(info)
+			require("competitest.layout").open(info.args)
+		end, {
+			nargs = "*"
+		})
+		cmd("CompetiTestReceive", function()
+			require("competitest.commands").receive_testcases()
+		end)
 
 		-- create highlight groups
 		M.setup_highlight_groups()
-		vim.api.nvim_command("autocmd ColorScheme * lua require('competitest').setup_highlight_groups()")
+
+		vim.api.nvim_create_autocmd("ColorScheme", {
+			pattern = "*",
+			callback = function()
+				require('competitest').setup_highlight_groups()
+			end
+		})
 
 		-- resize ui autocommand
-		vim.api.nvim_command("autocmd VimResized * lua require('competitest').resize_ui()")
+		vim.api.nvim_create_autocmd("VimResized", {
+			pattern = "*",
+			callback = function()
+				require('competitest').resize_ui()
+			end
+		})
+
 	end
 end
 
@@ -162,14 +207,14 @@ end
 ---Create CompetiTest highlight groups
 function M.setup_highlight_groups()
 	local highlight_groups = {
-		{ "CompetiTestRunning", "cterm=bold gui=bold" },
-		{ "CompetiTestDone", "cterm=none gui=none" },
-		{ "CompetiTestCorrect", "ctermfg=green guifg=#00ff00" },
-		{ "CompetiTestWarning", "ctermfg=yellow guifg=orange" },
-		{ "CompetiTestWrong", "ctermfg=red guifg=#ff0000" },
+		CompetiTestRunning = { cterm = { bold = true }, bold = true },
+		CompetiTestDone = { cterm = {} },
+		CompetiTestCorrect = { ctermfg = "green", fg = "#00ff00" },
+		CompetiTestWarning = { ctermfg = "yellow", fg = "orange" },
+		CompetiTestWrong = { ctermfg = "red", fg = "#ff0000" },
 	}
-	for _, hl in ipairs(highlight_groups) do
-		vim.api.nvim_command("hi! def " .. hl[1] .. " " .. hl[2])
+	for name, val in pairs(highlight_groups) do
+		vim.api.nvim_set_hl(0, name, val)
 	end
 end
 

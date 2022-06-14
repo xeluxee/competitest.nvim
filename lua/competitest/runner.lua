@@ -3,7 +3,7 @@ local luv = vim.loop
 local config = require("competitest.config")
 local compare = require("competitest.compare")
 local utils = require("competitest.utils")
-local ui = require("competitest.runner_ui")
+local ui = require("competitest.layout").ui
 
 local TCRunner = {}
 TCRunner.__index = TCRunner
