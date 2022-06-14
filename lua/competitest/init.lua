@@ -60,14 +60,14 @@ local default_config = {
 	},
 
 	layouts = {
-		'floating',
+		"floating",
 		{
 			name = "default",
 			cmd = "set nosplitright | vs | setl wfw | wincmd w | bel sp | vs | vs | 1wincmd w",
 			order = {1, 2, 3, 4}, -- errors, input, output, expected output
 		},
 	},
-	default_layout = 2,
+	default_layout = "floating",
 
 	save_current_file = true,
 	save_all_files = false,
