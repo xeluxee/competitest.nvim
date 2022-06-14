@@ -164,20 +164,6 @@ function M.setup(opts)
 			require("competitest.commands").receive_testcases()
 		end)
 
-		-- Needs refactor
-		cmd("CompetiTest", function(info)
-			require("competitest.commands").edit_testcase(true)
-		end, {
-			nargs = "+",
-			complete = function(ArgLead, CmdLine, CursorPos)
-				if CmdLine == "CompetiTest convert " then
-					return { "auto", "files_to_singlefile", "singlefile_to_files" }
-				end
-				return {"add", "edit", "delete", "convert", "run", "runNC", "receive"}
-			end
-		})
-
-
 		-- create highlight groups
 		M.setup_highlight_groups()
 
