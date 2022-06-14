@@ -60,14 +60,13 @@ local default_config = {
 	},
 
 	layouts = {
-		"floating",
-		{
-			name = "default",
+		floating = {},
+		default = {
 			cmd = "set nosplitright | vs | setl wfw | wincmd w | bel sp | vs | vs | 1wincmd w",
-			order = {1, 2, 3, 4}, -- errors, input, output, expected output
+			order = {1, 2, 3, 4, 5}, -- source, errors, input, output, expected output
 		},
 	},
-	default_layout = "floating",
+	default_layout = "default",
 
 	save_current_file = true,
 	save_all_files = false,
@@ -148,6 +147,7 @@ function M.setup(opts)
     command! -nargs=* CompetiTestRun lua require("competitest.commands").run_testcases(<q-args>, true)
     command! -nargs=* CompetiTestRunNC lua require("competitest.commands").run_testcases(<q-args>, false)
     command! CompetiTestRunNE lua require("competitest.runner_ui").show_ui()
+    command! -nargs=* CompetiTestLayout lua require("competitest.layout").show(<q-args>)
     command! CompetiTestReceive lua require("competitest.commands").receive_testcases()
     ]])
 
