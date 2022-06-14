@@ -59,6 +59,15 @@ local default_config = {
 		},
 	},
 
+	layouts = {
+		'floating',
+		{
+			name = "default",
+			cmd = "set nosplitright | vs | setl wfw | wincmd w | bel sp | vs | vs | 1wincmd w",
+			order = {1, 2, 3, 4}, -- errors, input, output, expected output
+		},
+	},
+
 	save_current_file = true,
 	save_all_files = false,
 	compile_directory = ".", -- working directory of compile_command, relatively to current file's path
