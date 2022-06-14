@@ -146,17 +146,17 @@ function M.setup(opts)
 			nargs = "+",
 			complete = function()
 				return { "auto", "files_to_singlefile", "singlefile_to_files" }
-			end
+			end,
 		})
 		cmd("CompetiTestRun", function(info)
 			require("competitest.commands").run_testcases(info.args, true)
 		end, {
-			nargs = "*"
+			nargs = "*",
 		})
 		cmd("CompetiTestRunNC", function(info)
 			require("competitest.commands").run_testcases(info.args, false)
 		end, {
-			nargs = "*"
+			nargs = "*",
 		})
 		cmd("CompetiTestRunNE", function()
 			require("competitest.runner_ui").show_ui()
@@ -171,18 +171,17 @@ function M.setup(opts)
 		vim.api.nvim_create_autocmd("ColorScheme", {
 			pattern = "*",
 			callback = function()
-				require('competitest').setup_highlight_groups()
-			end
+				require("competitest").setup_highlight_groups()
+			end,
 		})
 
 		-- resize ui autocommand
 		vim.api.nvim_create_autocmd("VimResized", {
 			pattern = "*",
 			callback = function()
-				require('competitest').resize_ui()
-			end
+				require("competitest").resize_ui()
+			end,
 		})
-
 	end
 end
 
