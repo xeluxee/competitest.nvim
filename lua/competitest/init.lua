@@ -127,7 +127,8 @@ function M.setup(opts)
 
 		-- CompetiTest commands
 		local function cmd(lhs, fun, opt)
-			vim.api.nvim_create_user_command(lhs, fun, opt or {})
+			opt = vim.tbl_extend("keep", opt or {}, { bang = true })
+			vim.api.nvim_create_user_command(lhs, fun, opt)
 		end
 
 		cmd("CompetiTestAdd", function()
