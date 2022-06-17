@@ -73,8 +73,7 @@ function TCRunner:run_testcases(tctbl, compile)
 		end
 		for tcnum, tc in pairs(tctbl) do
 			table.insert(self.tcdata, {
-				-- newline after stdin is needed, otherwise execution will get stuck in some cases
-				stdin = tc.input .. "\n",
+				stdin = tc.input,
 				-- expout = expected output
 				expout = tc.output,
 				tcnum = tcnum,
@@ -211,6 +210,7 @@ function TCRunner:execute_testcase(tcindex, exec, args, dir, callback)
 	end
 
 	luv.write(process.stdin, tc.stdin)
+	luv.shutdown(process.stdin)
 	tc.stdout = ""
 	luv.read_start(process.stdout, function(err, data)
 		if err or not data then
