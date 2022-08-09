@@ -72,7 +72,7 @@ end
 ---@param bufnr integer | nil: number representing the buffer in which the function should be executed
 ---@return string | nil: the converted string, or nil if it failed
 function M.eval_string(str, tcnum, inout, bufnr)
-	bufnr = bufnr or vim.fn.bufnr()
+	bufnr = bufnr or vim.api.nvim_get_current_buf()
 	M.modifiers["TCNUM"] = tostring(tcnum) -- testcase number
 	M.modifiers["INOUT"] = inout -- whether this file represents input or output
 

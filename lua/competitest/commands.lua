@@ -1,8 +1,5 @@
+local api = vim.api
 local config = require("competitest.config")
-local editor = require("competitest.editor")
-local picker = require("competitest.picker")
-local receive = require("competitest.receive")
-local runner = require("competitest.runner")
 local testcases = require("competitest.testcases")
 local utils = require("competitest.utils")
 local M = {}
@@ -11,7 +8,7 @@ local M = {}
 ---@param add_testcase boolean: if true a new testcases will be added, otherwise edit a testcase that already exists
 ---@param tcnum integer: testcase number
 function M.edit_testcase(add_testcase, tcnum)
-	local bufnr = vim.fn.bufnr()
+	local bufnr = api.nvim_get_current_buf()
 	config.load_buffer_config(bufnr) -- reload buffer configuration since it may have been updated in the meantime
 	local tctbl = testcases.get_testcases(bufnr)
 	if add_testcase then
@@ -37,11 +34,12 @@ function M.edit_testcase(add_testcase, tcnum)
 				testcases.write_testcase_on_files(bufnr, tcnum, tc.input, tc.output)
 			end
 		end
-		editor.start_ui(bufnr, tcnum, tctbl[tcnum].input, tctbl[tcnum].output, save_data, vim.api.nvim_get_current_win())
+
+		require("competitest.editor").start_ui(bufnr, tcnum, tctbl[tcnum].input, tctbl[tcnum].output, save_data, api.nvim_get_current_win())
 	end
 
 	if tcnum == "" then
-		picker.start_ui(bufnr, tctbl, "Edit a Testcase", start_editor, vim.api.nvim_get_current_win())
+		require("competitest.picker").start_ui(bufnr, tctbl, "Edit a Testcase", start_editor, api.nvim_get_current_win())
 	else
 		start_editor({ id = tonumber(tcnum) })
 	end
@@ -50,7 +48,7 @@ end
 ---Delete a testcase
 ---@param tcnum integer: testcase number
 function M.delete_testcase(tcnum)
-	local bufnr = vim.fn.bufnr()
+	local bufnr = api.nvim_get_current_buf()
 	config.load_buffer_config(bufnr) -- reload buffer configuration since it may have been updated in the meantime
 	local tctbl = testcases.get_testcases(bufnr)
 
@@ -75,7 +73,7 @@ function M.delete_testcase(tcnum)
 	end
 
 	if tcnum == "" then
-		picker.start_ui(bufnr, tctbl, "Delete a Testcase", delete_testcase, vim.api.nvim_get_current_win())
+		require("competitest.picker").start_ui(bufnr, tctbl, "Delete a Testcase", delete_testcase, api.nvim_get_current_win())
 	else
 		delete_testcase({ id = tonumber(tcnum) })
 	end
@@ -84,7 +82,7 @@ end
 ---Convert testcases from single file to multiple files and vice versa
 ---@param mode string: can be "singlefile_to_files", "files_to_singlefile" or "auto"
 function M.convert_testcases(mode)
-	local bufnr = vim.fn.bufnr()
+	local bufnr = api.nvim_get_current_buf()
 	local singlefile_tctbl = testcases.load_testcases_from_single_file(bufnr)
 	local no_singlefile = next(singlefile_tctbl) == nil
 	local files_tctbl = testcases.load_testcases_from_files(bufnr)
@@ -148,11 +146,19 @@ function M.convert_testcases(mode)
 	end
 end
 
+M.runners = {} -- runners associated with a buffer
+
+---Unload a runner (called on BufUnload)
+function M.remove_runner(bufnr)
+	M.runners[bufnr] = nil
+end
+
 ---Start testcases runner
 ---@param testcases_list string: string with integers representing testcases to run, or empty string to run all the testcases
 ---@param compile boolean: whether to compile or not
-function M.run_testcases(testcases_list, compile)
-	local bufnr = vim.fn.bufnr()
+---@param only_show boolean: if true show previously closed CompetiTest windows without executing testcases
+function M.run_testcases(testcases_list, compile, only_show)
+	local bufnr = api.nvim_get_current_buf()
 	config.load_buffer_config(bufnr)
 	local tctbl = testcases.get_testcases(bufnr)
 
@@ -160,27 +166,37 @@ function M.run_testcases(testcases_list, compile)
 		local new_tctbl = {}
 		testcases_list = vim.split(testcases_list, " ", { trimempty = true })
 		for _, tcnum in ipairs(testcases_list) do
-			tcnum = tonumber(tcnum)
-			if tctbl[tcnum] then
-				new_tctbl[tcnum] = tctbl[tcnum]
-			else
+			local num = tonumber(tcnum)
+			if not num or not tctbl[num] then -- invalid testcase
 				utils.notify("run_testcases: testcase " .. tcnum .. " doesn't exist!")
+			else
+				new_tctbl[num] = tctbl[num]
 			end
 		end
 		tctbl = new_tctbl
 	end
 
-	local r = runner:new(vim.fn.bufnr(), vim.api.nvim_get_current_win())
-	if r then
-		r:run_testcases(tctbl, compile)
-		r:show_ui()
+	if not M.runners[bufnr] then -- no runner is associated to buffer
+		M.runners[bufnr] = require("competitest.runner"):new(api.nvim_get_current_buf())
+		if not M.runners[bufnr] then -- an error occurred
+			return
+		end
+		-- remove runner data when buffer is unloaded
+		api.nvim_command("autocmd BufUnload <buffer=" .. bufnr .. "> lua require('competitest.commands').remove_runner(vim.fn.expand('<abuf>'))")
 	end
+	local r = M.runners[bufnr] -- current runner
+	if not only_show then
+		r:kill_all_processes()
+		r:run_testcases(tctbl, compile)
+	end
+	r:set_restore_winid(api.nvim_get_current_win())
+	r:show_ui()
 end
 
 function M.receive_testcases()
-	local bufnr = vim.fn.bufnr()
+	local bufnr = api.nvim_get_current_buf()
 	config.load_buffer_config(bufnr)
-	receive.start_receiving(bufnr)
+	require("competitest.receive").start_receiving(bufnr)
 end
 
 return M

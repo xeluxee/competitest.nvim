@@ -7,22 +7,26 @@
 ![License](https://img.shields.io/github/license/xeluxee/competitest.nvim?style=for-the-badge&logo=gnu)
 
 <h2>Competitive Programming with Neovim made Easy</h2>
+
+<!-- ![competitest_old](https://user-images.githubusercontent.com/88047141/147982101-2576e960-372c-4dec-b65e-97191c23a57d.png) -->
+![competitest_popup_ui](https://user-images.githubusercontent.com/88047141/149839002-280069e5-0c71-4aec-8e39-4443a1c44f5c.png)
+*CompetiTest's popup UI*
+
+![competitest_split_ui](https://user-images.githubusercontent.com/88047141/183751179-e07e2a4d-e2eb-468b-ba34-bb737cba4557.png)
+*CompetiTest's split UI*
 </div>
 
-![competitest](https://user-images.githubusercontent.com/88047141/149839002-280069e5-0c71-4aec-8e39-4443a1c44f5c.png)
-<!-- ![competitest](https://user-images.githubusercontent.com/88047141/147982101-2576e960-372c-4dec-b65e-97191c23a57d.png) -->
-
-`competitest.nvim` is a testcase manager and checker. It lets you save time in competitive programming contests by automating common tasks related to testcase management. It can compile, run and test your solutions across all the available testcases, displaying results in a nice interactive user interface.
+`competitest.nvim` is a testcase manager and checker. It saves you time in competitive programming contests by automating common tasks related to testcase management. It can compile, run and test your solutions across all the available testcases, displaying results in a nice interactive user interface.
 
 ## Features
 - Multiple languages supported: it works out of the box with C, C++, Rust, Java and Python, but other languages can be [configured](#customize-compile-and-run-commands)
-- Flexible. No fixed folder structure or strict file-naming rules. You can choose where to put the source code file, the testcases, where to execute your programs and many more
+- Flexible. No fixed folder structure or strict file-naming rules. You can choose where to put the source code file, the testcases, where to execute your programs and much more
 - Configurable (see [Configuration](#configuration)). You can even configure [every folder individually](#local-configuration)
-- Testcases can be stored in a single file or in multiple text files, see [usage notes](#usage-notes) 
+- Testcases can be stored in a single file or in multiple text files, see [usage notes](#usage-notes)
 - [Add](#add-or-edit-a-testcase) testcases with `:CompetiTestAdd`
 - [Edit](#add-or-edit-a-testcase) a testcases with `:CompetiTestEdit`
 - [Delete](#remove-a-testcase) a testcase with `:CompetiTestDelete`
-- [Run](#run-testcases) your program across all the testcases with `:CompetiTestRun`, showing results and execution data in a nice interactive window
+- [Run](#run-testcases) your program across all the testcases with `:CompetiTestRun`, showing results and execution data in a nice interactive UI
 - [Download](#receive-testcases) testcases automatically from competitive programming platforms with `:CompetiTestReceive`
 - Customizable highlight groups. See [Highlights](#highlights)
 - Interface resizes automatically when Neovim window is resized
@@ -164,9 +168,7 @@ require('competitest').setup {
 		},
 	},
 	runner_ui = {
-		total_width = 0.8,
-		total_height = 0.8,
-		selector_width = 0.3,
+		interface = "popup",
 		selector_show_nu = false,
 		selector_show_rnu = false,
 		show_nu = true,
@@ -188,6 +190,31 @@ require('competitest').setup {
 			show_nu = true,
 			show_rnu = false,
 			close_mappings = { "q", "Q" },
+		},
+	},
+	popup_ui = {
+		total_width = 0.8,
+		total_height = 0.8,
+		layout = {
+			{ 4, "tc" },
+			{ 5, { { 1, "so" }, { 1, "si" } } },
+			{ 5, { { 1, "eo" }, { 1, "se" } } },
+		},
+	},
+	split_ui = {
+		position = "right",
+		relative_to_editor = true,
+		total_width = 0.3,
+		vertical_layout = {
+			{ 1, "tc" },
+			{ 1, { { 1, "so" }, { 1, "eo" } } },
+			{ 1, { { 1, "si" }, { 1, "se" } } },
+		},
+		total_height = 0.4,
+		horizontal_layout = {
+			{ 2, "tc" },
+			{ 3, { { 1, "so" }, { 1, "si" } } },
+			{ 3, { { 1, "eo" }, { 1, "se" } } },
 		},
 	},
 
@@ -241,14 +268,12 @@ require('competitest').setup {
 	- `save_and_close`: keyboard mappings to save testcase content
 	- `cancel`: keyboard mappings to quit testcase editor without saving
 - `runner_ui`: settings related to testcase runner user interface
-	- `total_width`: a value from 0 to 1, representing the ratio between total runner width and Neovim width
-	- `total_height`: a value from 0 to 1, representing the ratio between total runner height and Neovim height
-	- `selector_width`: a value from 0 to 1, representing the ratio between testcase selector popup width and the total width
+	- `interface`: interface used to display testcases data. Can be `popup` (floating windows) or `split` (normal windows). Associated settings can be found in `popup_ui` and `split_ui`
 	- `selector_show_nu`: whether to show line numbers or not in testcase selector
 	- `selector_show_rnu`: whether to show relative line numbers or not in testcase selector
-	- `show_nu`: whether to show line numbers or not in details popups
-	- `show_rnu`: whether to show relative line numbers or not in details popups
-	- `mappings`: keyboard mappings used in testcase selector popup
+	- `show_nu`: whether to show line numbers or not in details windows
+	- `show_rnu`: whether to show relative line numbers or not in details windows
+	- `mappings`: keyboard mappings used in testcase selector window
 		- `run_again`: keymaps to run again a testcase
 		- `run_all_again`: keymaps to run again all testcases
 		- `kill`: keymaps to kill a testcase
@@ -264,6 +289,17 @@ require('competitest').setup {
 		- `show_nu`: whether to show line numbers or not in viewer window
 		- `show_rnu`: whether to show relative line numbers or not in viewer window
 		- `close_mappings`: keymaps to close viewer window
+- `popup_ui`: settings related to testcase runner popup interface
+	- `total_width`: a value from 0 to 1, representing the ratio between total interface width and Neovim width
+	- `total_height`: a value from 0 to 1, representing the ratio between total interface height and Neovim height
+	- `layout`: a table describing popup UI layout. For further details see [here](#customize-ui-layout)
+- `split_ui`: settings related to testcase runner split interface
+	- `position`: can be `top`, `bottom`, `left` or `right`
+	- `relative_to_editor`: whether to open split UI relatively to entire editor or to local window
+	- `total_width`: a value from 0 to 1, representing the ratio between total **vertical** split width and relative window width
+	- `vertical_layout`: a table describing vertical split UI layout. For further details see [here](#customize-ui-layout)
+	- `total_height`: a value from 0 to 1, representing the ratio between total **horizontal** split height and relative window height
+	- `horizontal_layout`: a table describing horizontal split UI layout. For further details see [here](#customize-ui-layout)
 - `save_current_file`: if true save current file before running testcases
 - `save_all_files`: if true save all the opened files before running testcases
 - `compile_directory`: execution directory of compiler, relatively to current file's path
@@ -353,6 +389,63 @@ See [available modifiers](#available-modifiers) to understand better how dollar 
 
 Feel free to open a PR or an issue if you think it's worth adding a new language among default ones.
 
+### Customize UI layout
+You can customize testcase runner user interface by defining windows positions and sizes trough a table describing a layout. This is possible both for popup and split UI.
+
+Every window is identified by a string representing its name and a number representing the proportion between its size and the sizes of other windows. To define a window use a lua table made by a number and a string. An example is `{ 1.5, "tc" }`.\
+Windows can be named as follows:
+- `tc` for testcases selector
+- `si` for standard input
+- `so` for standard output
+- `se` for standard error
+- `eo` for expected output
+
+A layout is a list made by windows or layouts (recursively defined). To define a layout use a lua table containing a list of windows or layouts.
+
+<table>
+<tr> <th>Sample code</th> <th>Result</th> </tr>
+<tr> <td>
+
+``` lua
+layout = {
+  { 2, "tc" },
+  { 3, {
+       { 1, "so" },
+       { 1, "si" },
+     } },
+  { 3, {
+       { 1, "eo" },
+       { 1, "se" },
+     } },
+}
+```
+</td> <td>
+
+![layout1](https://user-images.githubusercontent.com/88047141/183749940-b720e9b2-557d-460c-99d0-99a2a03a81bd.png)
+</td> </tr>
+<tr> <td>
+
+``` lua
+layout = {
+  { 1, {
+       { 1, "so" },
+       { 1, {
+            { 1, "tc" },
+            { 1, "se" },
+          } },
+     } },
+  { 1, {
+       { 1, "eo" },
+       { 1, "si" },
+     } },
+}
+```
+</td> <td>
+
+![layout2](https://user-images.githubusercontent.com/88047141/183750135-6dbd39ac-2fd4-4c10-be5f-034c1966929f.png)
+</td> </tr>
+</table>
+
 ## Highlights
 You can customize CompetiTest highlight groups. Their default values are:
 ``` vim
@@ -377,9 +470,9 @@ hi CompetiTestWrong   ctermfg=red    guifg=#ff0000
 	- [x] Run multiple testcases at the same time
 		- [x] Run again processes
 		- [x] Kill processes
-	- [x] Display results and execution data in a popup
-	- [ ] Display results and execution data in a split window
-	- [ ] Handle interactive tasks
+	- [x] Display results and execution data in a popup UI
+	- [x] Display results and execution data in a split window UI
+- [ ] Handle interactive tasks
 - [x] Configure every folder individually
 - [x] Integration with [competitive-companion](https://github.com/jmerle/competitive-companion) to download testcases automatically from competitive programming platforms
 - [ ] Integration with tools to submit solutions ([api-client](https://github.com/online-judge-tools/api-client) or [cpbooster](https://github.com/searleser97/cpbooster))

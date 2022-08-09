@@ -10,9 +10,8 @@ TCRunner.__index = TCRunner
 
 ---Create a new Testcase Runner
 ---@param bufnr integer: buffer number that specify the buffer to associate the runner with
----@param restore_winid integer | nil: bring the cursor to the given window after runner is closed
----@return table: a new TCRunner object
-function TCRunner:new(bufnr, restore_winid)
+---@return object: a new TCRunner object, or nil on failure
+function TCRunner:new(bufnr)
 	local filetype = api.nvim_buf_get_option(bufnr, "filetype")
 	local filedir = api.nvim_buf_call(bufnr, function()
 		return vim.fn.expand("%:p:h")
@@ -39,7 +38,6 @@ function TCRunner:new(bufnr, restore_winid)
 		compile_directory = filedir .. buf_cfg.compile_directory .. "/",
 		running_directory = filedir .. buf_cfg.running_directory .. "/",
 		testcase_directory = filedir .. buf_cfg.testcases_directory .. "/",
-		restore_winid = restore_winid,
 	}
 	if this.rc == nil then
 		utils.notify("TCRunner:new: run command for filetype '" .. filetype .. "' isn't configured properly.\nCannot proceed.")
@@ -136,6 +134,7 @@ function TCRunner:run_testcases(tctbl, compile)
 				run_first_testcases()
 			end
 		end
+
 		self:execute_testcase(1, self.cc.exec, self.cc.args, self.compile_directory, compilation_callback)
 	end
 end
@@ -193,8 +192,7 @@ function TCRunner:execute_testcase(tcindex, exec, args, dir, callback)
 			tc.timer:close()
 		end
 
-		ui.options.update_popups = true
-		ui.update_ui(self.tcdata)
+		self:update_ui(true)
 		if callback then
 			callback()
 		end
@@ -204,8 +202,7 @@ function TCRunner:execute_testcase(tcindex, exec, args, dir, callback)
 		tc.status = "FAILED"
 		tc.hlgroup = "CompetiTestWarning"
 		tc.time = -1
-		ui.options.update_popups = true
-		ui.update_ui(self.tcdata)
+		self:update_ui(true)
 		return
 	end
 
@@ -230,12 +227,11 @@ function TCRunner:execute_testcase(tcindex, exec, args, dir, callback)
 				tc.status = "DONE"
 				tc.hlgroup = "CompetiTestDone"
 			end
-			ui.options.update_popups = true
+			self:update_ui(true)
 		else
 			tc.stdout = tc.stdout .. string.gsub(data, "\r\n", "\n")
-			ui.options.update_details = true
+			self:update_ui()
 		end
-		ui.update_ui(self.tcdata)
 	end)
 	tc.stderr = ""
 	luv.read_start(process.stderr, function(err, data)
@@ -245,8 +241,7 @@ function TCRunner:execute_testcase(tcindex, exec, args, dir, callback)
 			return
 		end
 		tc.stderr = tc.stderr .. string.gsub(data, "\r\n", "\n")
-		ui.options.update_details = true
-		ui.update_ui(self.tcdata)
+		self:update_ui()
 	end)
 
 	if tc.timelimit then
@@ -266,8 +261,7 @@ function TCRunner:execute_testcase(tcindex, exec, args, dir, callback)
 	tc.hlgroup = "CompetiTestRunning"
 	tc.running = true
 	tc.killed = false
-	ui.options.update_popups = true
-	ui.update_ui(self.tcdata)
+	self:update_ui(true)
 end
 
 ---Kill the process associated with a testcase
@@ -288,15 +282,49 @@ end
 
 ---Kill all the running processes associated with testcases
 function TCRunner:kill_all_processes()
-	for tcindex, _ in pairs(self.tcdata) do
-		self:kill_process(tcindex)
+	if self.tcdata then
+		for tcindex, _ in pairs(self.tcdata) do
+			self:kill_process(tcindex)
+		end
 	end
 end
 
 ---Show Runner UI
 function TCRunner:show_ui()
-	ui.init_ui(self)
-	ui.update_ui(self.tcdata)
+	if not self.tcdata then -- nothing to show
+		return
+	end
+	if not self.ui then
+		self.ui = ui:new(self.config.runner_ui.interface, self.restore_winid)
+		self.ui.runner = self
+	end
+	self.ui:show_ui()
+	self.ui:update_ui()
+end
+
+---Set or update restore_winid
+---@param winid integer: bring the cursor to the given window after runner is closed
+function TCRunner:set_restore_winid(winid)
+	self.restore_winid = winid
+	if self.ui then
+		self.ui.restore_winid = winid
+	end
+end
+
+---Update Runner UI content
+---@param update_windows boolean | nil: whether to update all the windows or only details windows
+function TCRunner:update_ui(update_windows)
+	if self.ui then
+		self.ui.update_windows = update_windows or false
+		self.ui.update_details = true
+		self.ui:update_ui()
+	end
+end
+
+function TCRunner:resize_ui()
+	if self.ui then
+		self.ui:resize_ui()
+	end
 end
 
 return TCRunner

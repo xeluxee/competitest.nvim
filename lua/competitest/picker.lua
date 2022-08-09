@@ -19,7 +19,7 @@ function M.start_ui(bufnr, tctbl, title, send_data, restore_winid)
 			utils.notify("there's no testcase to pick from.")
 			return
 		end
-		M.options.bufnr = bufnr or vim.fn.bufnr()
+		M.options.bufnr = bufnr or vim.api.nvim_get_current_buf()
 		M.options.menu_items = {}
 		for tcnum, _ in pairs(tctbl) do
 			table.insert(M.options.menu_items, nui_menu.item("Testcase " .. tcnum, { id = tcnum }))

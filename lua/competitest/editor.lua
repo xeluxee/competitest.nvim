@@ -21,7 +21,7 @@ function M.start_ui(bufnr, tcnum, input_content, output_content, send_data, rest
 		output_content = api.nvim_buf_get_lines(M.popups.output_popup.bufnr, 0, -1, false)
 		M.delete_ui()
 	else
-		M.options.bufnr = bufnr or vim.fn.bufnr()
+		M.options.bufnr = bufnr or api.nvim_get_current_buf()
 		M.options.tcnum = tcnum and tostring(tcnum) .. " " or ""
 		input_content = vim.split(input_content or "", "\n")
 		output_content = vim.split(output_content or "", "\n")

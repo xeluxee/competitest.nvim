@@ -32,9 +32,7 @@ local default_config = {
 		},
 	},
 	runner_ui = { -- user interface used by CompetiTestRun
-		total_width = 0.8, -- from 0 to 1, total width of testcases popup and details popups together
-		total_height = 0.8, -- from 0 to 1, total height of testcases popup and details popups together
-		selector_width = 0.3, -- from 0 to 1, how large should the testcases selector popup be, compared to total_width
+		interface = "popup", -- interface type, can be 'popup' or 'split'
 		selector_show_nu = false, -- show line number in testcase selector window
 		selector_show_rnu = false, -- show relative line number in testcase selector window
 		show_nu = true, -- show line number in details popups
@@ -56,6 +54,49 @@ local default_config = {
 			show_nu = true, -- show line number
 			show_rnu = false, -- show relative line number
 			close_mappings = { "q", "Q" },
+		},
+	},
+	popup_ui = {
+		total_width = 0.8, -- from 0 to 1, total width of popup ui
+		total_height = 0.8, -- from 0 to 1, total height of popup ui
+		layout = {
+			{ 3, "tc" },
+			{ 4, {
+				{ 1, "so" },
+				{ 1, "si" },
+			} },
+			{ 4, {
+				{ 1, "eo" },
+				{ 1, "se" },
+			} },
+		},
+	},
+	split_ui = {
+		position = "right", -- top, right, left, bottom
+		relative_to_editor = true, -- open split relative to editor or to local window
+		total_width = 0.3, -- from 0 to 1, total width of vertical split
+		vertical_layout = {
+			{ 1, "tc" },
+			{ 1, {
+				{ 1, "so" },
+				{ 1, "eo" },
+			} },
+			{ 1, {
+				{ 1, "si" },
+				{ 1, "se" },
+			} },
+		},
+		total_height = 0.4, -- from 0 to 1, total height of horizontal split
+		horizontal_layout = {
+			{ 2, "tc" },
+			{ 3, {
+				{ 1, "so" },
+				{ 1, "si" },
+			} },
+			{ 3, {
+				{ 1, "eo" },
+				{ 1, "se" },
+			} },
 		},
 	},
 
@@ -101,7 +142,36 @@ function M.update_config_table(cfg_tbl, opts)
 	local new_config = cfg_tbl or default_config
 
 	if opts then
+		-- check deprecated options
+		if opts.runner_ui then
+			for _, option in ipairs({ "total_width", "total_height" }) do
+				if opts.runner_ui[option] then
+					opts.popup_ui = opts.popup_ui or {}
+					opts.popup_ui[option] = opts.runner_ui[option]
+					opts.runner_ui[option] = nil
+					vim.schedule(function()
+						vim.notify(
+							"CompetiTest.nvim: option 'runner_ui." .. option .. "' has been deprecated in favour of 'popup_ui." .. option .. "'.",
+							vim.log.levels.WARN,
+							{ title = "CompetiTest" }
+						)
+					end)
+				end
+			end
+			if opts.runner_ui.selector_width then
+				opts.runner_ui.selector_width = nil
+				vim.schedule(function()
+					vim.notify(
+						"CompetiTest.nvim: option 'runner_ui.selector_width' has been deprecated. See 'popup_ui.layout'.",
+						vim.log.levels.WARN,
+						{ title = "CompetiTest" }
+					)
+				end)
+			end
+		end
+
 		new_config = vim.tbl_deep_extend("force", new_config, opts)
+
 		-- commands arguments lists need to be replaced and not extended
 		for lang, cmd in pairs(opts.compile_command or {}) do
 			if cmd.args then
@@ -123,7 +193,7 @@ function M.setup(opts)
 	M.current_setup = M.update_config_table(M.current_setup, opts)
 
 	if not M.current_setup.loaded then
-		M.current_setup = vim.tbl_extend("force", M.current_setup, { loaded = true })
+		M.current_setup.loaded = true
 
 		-- CompetiTest commands
 		vim.cmd([[
@@ -137,7 +207,7 @@ function M.setup(opts)
     command! -nargs=1 -complete=custom,s:convert_command_completion CompetiTestConvert lua require("competitest.commands").convert_testcases(<q-args>)
     command! -nargs=* CompetiTestRun lua require("competitest.commands").run_testcases(<q-args>, true)
     command! -nargs=* CompetiTestRunNC lua require("competitest.commands").run_testcases(<q-args>, false)
-    command! CompetiTestRunNE lua require("competitest.runner_ui").show_ui()
+		command! CompetiTestRunNE lua require("competitest.commands").run_testcases(<q-args>, false, true)
     command! CompetiTestReceive lua require("competitest.commands").receive_testcases()
     ]])
 
@@ -155,7 +225,9 @@ function M.resize_ui()
 	vim.schedule(function()
 		require("competitest.editor").start_ui("resized")
 		require("competitest.picker").start_ui("resized")
-		require("competitest.runner_ui").init_ui(nil, true)
+		for _, r in pairs(require("competitest.commands").runners) do
+			r:resize_ui()
+		end
 	end)
 end
 
