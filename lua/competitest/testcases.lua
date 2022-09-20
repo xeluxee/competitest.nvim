@@ -94,14 +94,20 @@ end
 ---@param bufnr integer: buffer number
 ---@return table: a table of tables made by two strings, input and output
 function M.get_testcases(bufnr)
+	local loader1 = M.load_testcases_from_files
+	local loader2 = M.load_testcases_from_single_file
 	if cgc(bufnr).testcases_use_single_file then
-		return M.load_testcases_from_single_file(bufnr)
-	else
-		return M.load_testcases_from_files(bufnr)
+		loader1, loader2 = loader2, loader1
 	end
+
+	local tctbl = loader1(bufnr)
+	if next(tctbl) == nil and cgc(bufnr).testcases_auto_detect_storage then
+		tctbl = loader2(bufnr)
+	end
+	return tctbl
 end
 
----Write all the testcases on a single msgpack/json encoded file
+---Write all the testcases on a single msgpack/json encoded file, or delete it if the specified content is empty
 ---@param bufnr integer: buffer number
 ---@param tctbl table: a table of tables made by two strings, input and output
 function M.write_testcases_on_single_file(bufnr, tctbl)
@@ -121,7 +127,7 @@ function M.write_testcases_on_single_file(bufnr, tctbl)
 	local tcdir = M.get_testcases_path(bufnr)
 	local fpath = tcdir .. utils.eval_string(cgc(bufnr).testcases_single_file_format, 0, "", bufnr)
 	if next(tctbl) == nil then
-		if utils.does_file_exists(fpath) then
+		if utils.does_file_exist(fpath) then
 			utils.delete_file(fpath)
 		end
 	else
@@ -137,7 +143,7 @@ end
 function M.write_testcase_on_files(bufnr, tcnum, input, output)
 	local function update_file(fpath, content)
 		if not content or content == "" then
-			if utils.does_file_exists(fpath) then
+			if utils.does_file_exist(fpath) then
 				utils.delete_file(fpath)
 			end
 		else

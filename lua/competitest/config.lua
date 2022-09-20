@@ -16,7 +16,7 @@ function M.load_buffer_config(bufnr)
 	local prev_len = #dir
 	while not local_config do
 		local config_file = dir .. "/" .. competitest.current_setup.local_config_file_name
-		if utils.does_file_exists(config_file) then
+		if utils.does_file_exist(config_file) then
 			local_config = dofile(config_file)
 			if type(local_config) ~= "table" then
 				utils.notify("load_buffer_config: '" .. config_file .. "' doesn't return a table.")

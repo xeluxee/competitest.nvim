@@ -121,11 +121,12 @@ local default_config = {
 	maximum_time = 5000, -- maximum time (in milliseconds) given to a process. If it's excedeed process will be killed
 	output_compare_method = "squish", -- "exact", "squish" or custom function returning true if comparison is valid
 
+	testcases_use_single_file = false,
+	testcases_auto_detect_storage = true, -- if true auto detect storage method (single or multiple files). If both are present use the one specified in testcases_use_single_file
 	input_name = "input",
 	output_name = "output",
 	-- $(INOUT) will be substituted with input_name or output_name content
 	testcases_files_format = "$(FNOEXT)_$(INOUT)$(TCNUM).txt",
-	testcases_use_single_file = false,
 	testcases_single_file_format = "$(FNOEXT).testcases",
 	testcases_directory = ".", -- where testcases are located, relatively to current file's path
 

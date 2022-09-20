@@ -94,7 +94,7 @@ function TCRunner:run_testcases(tctbl, compile)
 	local tc_size = #self.tcdata -- how many testcases
 	local mut = self.config.multiple_testing -- multiple testing, how many testcases to run at the same time
 	if mut == -1 then -- -1 -> use the number of available cpu cores
-		mut = #vim.loop.cpu_info()
+		mut = #luv.cpu_info()
 	elseif mut == 0 then -- 0 -> run all testcases together
 		mut = tc_size
 	end

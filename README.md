@@ -6,7 +6,7 @@
 ![Lua](https://img.shields.io/badge/Lua-%232C2D72.svg?style=for-the-badge&logo=lua)
 ![License](https://img.shields.io/github/license/xeluxee/competitest.nvim?style=for-the-badge&logo=gnu)
 
-<h2>Competitive Programming with Neovim made Easy</h2>
+## Competitive Programming with Neovim made Easy
 
 <!-- ![competitest_old](https://user-images.githubusercontent.com/88047141/147982101-2576e960-372c-4dec-b65e-97191c23a57d.png) -->
 ![competitest_popup_ui](https://user-images.githubusercontent.com/88047141/149839002-280069e5-0c71-4aec-8e39-4443a1c44f5c.png)
@@ -66,8 +66,10 @@ To see all the available settings see [configuration](#configuration).
 - Your programs must read from `stdin` and print to `stdout`. If `stderr` is used its content will be displayed
 - A testcase is made by an input and an output (containing the correct answer)
 - Input is necessary for a testcase to be considered, while an output hasn't to be provided necessarily
-- Testcases can be stored in multiple text files or in a single [msgpack](https://msgpack.org/) encoded file. You can choose how to store them with `testcases_use_single_file` boolean option in in [configuration](#configuration). By default it's false, so multiple files are used\
-If you want to change the way already existing testcases are stored see [conversion](#convert-testcases)
+- Testcases can be stored in multiple text files or in a single [msgpack](https://msgpack.org/) encoded file
+	- You can choose how to store them with `testcases_use_single_file` boolean option in in [configuration](#configuration). By default it's false, so multiple files are used
+	- Storage method can be automatically detected when option `testcases_auto_detect_storage` is true
+	- If you want to change the way already existing testcases are stored see [conversion](#convert-testcases)
 
 #### Storing testcases in multiple text files
 - To store testcases in multiple text files set `testcases_use_single_file` to false
@@ -104,7 +106,7 @@ One of the following arguments is needed:
 - `files_to_singlefile`: convert multiple text files into a single file
 - `auto`: if there's a single file convert it into multiple files, otherwise convert multiple files into a single file
 
-**NOTE:** this command only converts already existing testcases files without changing CompetiTest configuration. To choose the storage method to use you have to [configure](#configuration) `testcases_use_single_file` option, that is false by default.
+**NOTE:** this command only converts already existing testcases files without changing CompetiTest configuration. To choose the storage method to use you have to [configure](#configuration) `testcases_use_single_file` option, that is false by default. Anyway storage method can be automatically detected when option `testcases_auto_detect_storage` is true.
 
 ### Run testcases
 Launch `:CompetiTestRun`. CompetiTest's interface will appear and you'll be able to view details about a testcase by moving the cursor over its entry. You can close the UI by pressing `q` or `Q`.\
@@ -240,10 +242,11 @@ require('competitest').setup {
 	output_compare_method = "squish",
 
 	testcases_directory = ".",
+	testcases_use_single_file = false,
+	testcases_auto_detect_storage = true,
 	input_name = "input",
 	output_name = "output",
 	testcases_files_format = "$(FNOEXT)_$(INOUT)$(TCNUM).txt",
-	testcases_use_single_file = false,
 	testcases_single_file_format = "$(FNOEXT).testcases",
 
 	companion_port = 27121,
@@ -313,10 +316,11 @@ require('competitest').setup {
 	- set it to any positive integer to run that number of testcases contemporarily
 - `maximum_time`: maximum time, in milliseconds, given to processes. If it's exceeded process will be killed
 - `testcases_directory`: where testcases files are located, relatively to current file's path
+- `testcases_use_single_file`: if true testcases will be stored in a single file instead of using multiple text files. If you want to change the way already existing testcases are stored see [conversion](#convert-testcases)
+- `testcases_auto_detect_storage`: if true testcases storage method will be detected automatically. When both text files and single file are available, testcases will be loaded according to the preference specified in `testcases_use_single_file`
 - `input_name`: the string substituted to `$(INOUT)` (see [modifiers](#available-modifiers)), used to name input files
 - `output_name`: the string substituted to `$(INOUT)` (see [modifiers](#available-modifiers)), used to name output files
 - `testcases_files_format`: string representing how testcases files should be named (see [modifiers](#available-modifiers))
-- `testcases_use_single_file`: if true testcases will be stored in a single file instead of using multiple text files. If you want to change the way already existing testcases are stored see [conversion](#convert-testcases)
 - `testcases_single_file_format`: string representing how single testcases files should be named (see [modifiers](#available-modifiers))
 - `output_compare_method`: how given output (stdout) and expected output should be compared. It can be a string, representing the method to use, or a custom function. Available options follows:
 	- `"exact"`: character by character comparison
@@ -445,6 +449,9 @@ layout = {
 ![layout2](https://user-images.githubusercontent.com/88047141/183750135-6dbd39ac-2fd4-4c10-be5f-034c1966929f.png)
 </td> </tr>
 </table>
+
+When using split UI windows name can be displayed in statusline or in winbar. In each CompetiTest buffer there's a local variable called `competitest_title`, that is a string representing window name. You can get its value using `nvim_buf_get_var(buffer_number, 'competitest_title')`.\
+See the [second screenshot](#competitive-programming-with-neovim-made-easy) for an example statusline used with split UI.
 
 ## Highlights
 You can customize CompetiTest highlight groups. Their default values are:

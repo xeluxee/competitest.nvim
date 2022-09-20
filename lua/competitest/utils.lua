@@ -8,7 +8,7 @@ M.modifiers = {
 
 	-- $(HOME): home user directory
 	["HOME"] = function()
-		return vim.loop.os_homedir()
+		return luv.os_homedir()
 	end,
 
 	-- $(FNAME): full file name
@@ -116,14 +116,8 @@ end
 ---Return true if the given file exists, otherwise false
 ---@param filepath string
 ---@return boolean
-function M.does_file_exists(filepath)
-	local fd = luv.fs_open(filepath, "r", 438)
-	if fd == nil then
-		return false
-	else
-		assert(luv.fs_close(fd), "CompetiTest.nvim: does_file_exists: unable to close '" .. filepath .. "'")
-		return true
-	end
+function M.does_file_exist(filepath)
+	return luv.fs_stat(filepath) ~= nil
 end
 
 ---This function returns the content of the specified file as a string, or nil if the given path is invalid
