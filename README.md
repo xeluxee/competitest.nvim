@@ -184,6 +184,7 @@ require('competitest').setup {
 			view_output = { "a", "A" },
 			view_stdout = { "o", "O" },
 			view_stderr = { "e", "E" },
+			toggle_diff = { "D", "<C-d>" },
 			close = { "q", "Q" },
 		},
 		viewer = {
@@ -285,6 +286,7 @@ require('competitest').setup {
 		- `view_output`: keymaps to view expected output in a bigger window
 		- `view_stdout`: keymaps to view programs's output (stdout) in a bigger window
 		- `view_stderr`: keymaps to view programs's errors (stderr) in a bigger window
+		- `toggle_diff`: keymaps to toggle diff view of actual and expected output
 		- `close`: keymaps to close runner user interface
 	- `viewer`: keyboard mappings used in [viewer window](#view-details)
 		- `width`: a value from 0 to 1, representing the ratio between viewer window width and Neovim width

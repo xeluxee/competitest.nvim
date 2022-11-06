@@ -46,6 +46,7 @@ local default_config = {
 			view_output = { "a", "A" },
 			view_stdout = { "o", "O" },
 			view_stderr = { "e", "E" },
+			toggle_diff = { "D", "<C-d>" },
 			close = { "q", "Q" },
 		},
 		viewer = { -- viewer window, to view in detail a stream (input, expected output, stdout or stderr)
