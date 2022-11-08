@@ -184,7 +184,7 @@ require('competitest').setup {
 			view_output = { "a", "A" },
 			view_stdout = { "o", "O" },
 			view_stderr = { "e", "E" },
-			toggle_diff = { "D", "<C-d>" },
+			toggle_diff = { "d", "D" },
 			close = { "q", "Q" },
 		},
 		viewer = {

@@ -173,7 +173,7 @@ function RunnerUI:show_ui()
 		for _, map in ipairs(self.runner.config.runner_ui.mappings.view_stderr) do
 			open_viewer(map, "se")
 		end
-		-- view stderr in a bigger window keymaps
+		-- toggle diff view in expected and slandered output
 		for _, map in ipairs(self.runner.config.runner_ui.mappings.toggle_diff) do
 			self.windows.tc:map("n", map, function()
 				self:toggle_diff_view()
