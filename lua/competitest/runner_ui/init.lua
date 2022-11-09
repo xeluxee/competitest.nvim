@@ -51,13 +51,11 @@ end
 function RunnerUI:resize_ui()
 	local cursor_position = self.ui_visible and api.nvim_win_get_cursor(self.windows.tc.winid) -- restore cursor position later
 	local was_viewer_visible = self.viewer_visible -- make viewer visible later
-	local was_diff_enabled = self.diff_view_enabled -- store diff state
 	self:delete()
 	if cursor_position then -- if cursor_position isn't nil ui was visible
 		self:show_ui()
 		vim.schedule(function()
 			self.make_viewer_visible = was_viewer_visible -- make update_ui() open viewer after updating details
-			self.enable_diff = was_diff_enabled -- make update_ui() enable diff
 			api.nvim_win_set_cursor(self.windows.tc.winid, cursor_position)
 		end)
 	end
@@ -197,32 +195,42 @@ function RunnerUI:show_ui()
 		self.interface.show_ui(self.windows)
 		self.ui_visible = true
 	end
+
+	if self.diff_view_enabled then -- enable diff view if previously enabled
+		self.diff_view_enabled = false
+		self:toggle_diff_view()
+	end
 	api.nvim_set_current_win(self.windows.tc.winid)
 end
 
--- Enable Diff view
-function RunnerUI:toggle_diff_view()
-	if not self.diff_view_enabled then
-		vim.api.nvim_win_call(self.windows.eo.winid, function ()
-			vim.cmd('diffthis')
-		end)
-		vim.api.nvim_win_call(self.windows.so.winid, function ()
-			vim.cmd('diffthis')
-		end)
-	else
-		vim.api.nvim_win_call(self.windows.eo.winid, function ()
-			vim.cmd('diffoff')
-		end)
-		vim.api.nvim_win_call(self.windows.so.winid, function ()
-			vim.cmd('diffoff')
-		end)
-	end
-	self.diff_view_enabled = not self.diff_view_enabled
+--- Enable Diff view
+---Enable or disable diffview in given window
+---@param winid integer
+---@param enable_diff boolean
+local function win_set_diff(winid, enable_diff)
+	api.nvim_win_call(winid, function()
+		api.nvim_command(enable_diff and "diffthis" or "diffoff")
+	end)
 end
+
+---Toggle diffview between standard output and expected output windows
+function RunnerUI:toggle_diff_view()
+	self.diff_view_enabled = not self.diff_view_enabled
+	win_set_diff(self.windows.eo.winid, self.diff_view_enabled)
+	win_set_diff(self.windows.so.winid, self.diff_view_enabled)
+end
+
+---Disable diffview between standard output and expected output windows
+function RunnerUI:disable_diff_view()
+	win_set_diff(self.windows.eo.winid, false)
+	win_set_diff(self.windows.so.winid, false)
+end
+
 
 ---Hide RunnerUI preserving buffers, so it can be shown later
 function RunnerUI:hide_ui()
 	if self.ui_visible then
+		self:disable_diff_view() -- disable diff when closing windows to prevent conflicts with other diffviews
 		for _, w in pairs(self.windows) do
 			if w then -- if a window is uninitialized its value is nil
 				w:hide()
@@ -230,13 +238,15 @@ function RunnerUI:hide_ui()
 		end
 		self.ui_visible = false
 		self.viewer_visible = false
-		self.diff_view_enabled = false
 		api.nvim_set_current_win(self.restore_winid or 0)
 	end
 end
 
 ---Delete RunnerUI and uninitialize all the windows
 function RunnerUI:delete()
+	if self.ui_visible then
+		self:disable_diff_view() -- disable diff when closing windows to prevent conflicts with other diffviews
+	end
 	for _, w in pairs(self.windows) do
 		if w then -- if a window is uninitialized its value is nil
 			w:unmount()
@@ -247,7 +257,6 @@ function RunnerUI:delete()
 	self.ui_visible = false
 	self.viewer_initialized = false
 	self.viewer_visible = false
-	self.diff_view_enabled = false
 	api.nvim_set_current_win(self.restore_winid or 0)
 end
 
@@ -397,10 +406,6 @@ function RunnerUI:update_ui()
 		if self.make_viewer_visible then
 			self.make_viewer_visible = nil
 			self:show_viewer_popup()
-		end
-		if self.enable_diff then
-			self.enable_diff = nil
-			self:toggle_diff_view()
 		end
 	end)
 end
