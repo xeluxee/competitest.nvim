@@ -28,8 +28,9 @@
 - [Delete](#remove-a-testcase) a testcase with `:CompetiTestDelete`
 - [Run](#run-testcases) your program across all the testcases with `:CompetiTestRun`, showing results and execution data in a nice interactive UI
 - [Download](#receive-testcases) testcases automatically from competitive programming platforms with `:CompetiTestReceive`
+- View diff between actual and expected output
+- [Customizable interface](#customize-ui-layout) that resizes automatically when Neovim window is resized
 - Customizable highlight groups. See [Highlights](#highlights)
-- Interface resizes automatically when Neovim window is resized
 
 ## Installation
 **NOTE:** this plugins requires Neovim ≥ 0.5
@@ -124,6 +125,7 @@ If you have previously closed the UI and you want to re-open it without re-execu
 - View expected output in a bigger window by pressing `a` or `A`
 - View stdout in a bigger window by pressing `o` or `O`
 - View stderr in a bigger window by pressing `e` or `E`
+- Toggle diff view between actual and expected output by pressing `d` or `D`
 
 Of course all these keybindings can be customized: see `runner_ui` ➤ `mappings` in [configuration](#configuration)
 
@@ -241,6 +243,7 @@ require('competitest').setup {
 	multiple_testing = -1,
 	maximum_time = 5000,
 	output_compare_method = "squish",
+	view_output_diff = false,
 
 	testcases_directory = ".",
 	testcases_use_single_file = false,
@@ -286,7 +289,7 @@ require('competitest').setup {
 		- `view_output`: keymaps to view expected output in a bigger window
 		- `view_stdout`: keymaps to view programs's output (stdout) in a bigger window
 		- `view_stderr`: keymaps to view programs's errors (stderr) in a bigger window
-		- `toggle_diff`: keymaps to toggle diff view of actual and expected output
+		- `toggle_diff`: keymaps to toggle diff view between actual and expected output
 		- `close`: keymaps to close runner user interface
 	- `viewer`: keyboard mappings used in [viewer window](#view-details)
 		- `width`: a value from 0 to 1, representing the ratio between viewer window width and Neovim width
@@ -311,19 +314,11 @@ require('competitest').setup {
 - `compile_command`: configure the command used to compile code for every different language, see [here](#customize-compile-and-run-commands)
 - `running_directory`: execution directory of your solutions, relatively to current file's path
 - `run_command`: configure the command used to run your solutions for every different language, see [here](#customize-compile-and-run-commands)
-
 - `multiple_testing`: how many testcases to run at the same time
 	- set it to `-1` if you want to run as many testcases as the number of available CPU cores at the same time
 	- set it to `0` if you want to run all the testcases together
 	- set it to any positive integer to run that number of testcases contemporarily
 - `maximum_time`: maximum time, in milliseconds, given to processes. If it's exceeded process will be killed
-- `testcases_directory`: where testcases files are located, relatively to current file's path
-- `testcases_use_single_file`: if true testcases will be stored in a single file instead of using multiple text files. If you want to change the way already existing testcases are stored see [conversion](#convert-testcases)
-- `testcases_auto_detect_storage`: if true testcases storage method will be detected automatically. When both text files and single file are available, testcases will be loaded according to the preference specified in `testcases_use_single_file`
-- `input_name`: the string substituted to `$(INOUT)` (see [modifiers](#available-modifiers)), used to name input files
-- `output_name`: the string substituted to `$(INOUT)` (see [modifiers](#available-modifiers)), used to name output files
-- `testcases_files_format`: string representing how testcases files should be named (see [modifiers](#available-modifiers))
-- `testcases_single_file_format`: string representing how single testcases files should be named (see [modifiers](#available-modifiers))
 - `output_compare_method`: how given output (stdout) and expected output should be compared. It can be a string, representing the method to use, or a custom function. Available options follows:
 	- `"exact"`: character by character comparison
 	- `"squish"`: compare stripping extra white spaces and newlines
@@ -339,6 +334,14 @@ require('competitest').setup {
 			end
 		}
 		```
+- `view_output_diff`: view diff between actual output and expected output in their respective windows
+- `testcases_directory`: where testcases files are located, relatively to current file's path
+- `testcases_use_single_file`: if true testcases will be stored in a single file instead of using multiple text files. If you want to change the way already existing testcases are stored see [conversion](#convert-testcases)
+- `testcases_auto_detect_storage`: if true testcases storage method will be detected automatically. When both text files and single file are available, testcases will be loaded according to the preference specified in `testcases_use_single_file`
+- `input_name`: the string substituted to `$(INOUT)` (see [modifiers](#available-modifiers)), used to name input files
+- `output_name`: the string substituted to `$(INOUT)` (see [modifiers](#available-modifiers)), used to name output files
+- `testcases_files_format`: string representing how testcases files should be named (see [modifiers](#available-modifiers))
+- `testcases_single_file_format`: string representing how single testcases files should be named (see [modifiers](#available-modifiers))
 - `companion_port`: competitive companion port number
 - `receive_print_message`: if true notify user that plugin is ready to receive testcases or that testcases have just been received
 

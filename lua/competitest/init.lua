@@ -121,6 +121,7 @@ local default_config = {
 	multiple_testing = -1, -- how many testcases to run at the same time. Set it to 0 to run all them together, -1 to use the number of available cpu cores, or any positive number to run how many testcases you want
 	maximum_time = 5000, -- maximum time (in milliseconds) given to a process. If it's excedeed process will be killed
 	output_compare_method = "squish", -- "exact", "squish" or custom function returning true if comparison is valid
+	view_output_diff = false, -- view diff between standard output and expected output in their respective windows
 
 	testcases_use_single_file = false,
 	testcases_auto_detect_storage = true, -- if true auto detect storage method (single or multiple files). If both are present use the one specified in testcases_use_single_file

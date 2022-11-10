@@ -295,8 +295,7 @@ function TCRunner:show_ui()
 		return
 	end
 	if not self.ui then
-		self.ui = ui:new(self.config.runner_ui.interface, self.restore_winid)
-		self.ui.runner = self
+		self.ui = ui:new(self)
 	end
 	self.ui:show_ui()
 	self.ui:update_ui()

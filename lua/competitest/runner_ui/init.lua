@@ -6,19 +6,18 @@ local RunnerUI = {}
 RunnerUI.__index = RunnerUI
 
 ---Create a new user interface for testcases runner
----@param interface string: interface type, can be 'popup' or 'split'
----@param restore_winid integer: bring the cursor to the given window after runner is closed
+---@param runner TCRunner: associated testcase runner
 ---@return object: a new RunnerUI object, or nil on failure
-function RunnerUI:new(interface, restore_winid)
+function RunnerUI:new(runner)
 	local this = {
-		runner = nil, -- associated TCRunner
+		runner = runner,
 		ui_initialized = false,
 		ui_visible = false,
 		viewer_initialized = false,
 		viewer_visible = false,
 		viewer_content = nil,
-		diff_view_enabled = false,
-		restore_winid = restore_winid,
+		diff_view = runner.config.view_output_diff,
+		restore_winid = runner.restore_winid,
 		update_details = false, -- if true update details windows
 		update_windows = false, -- if true update all the windows
 		update_testcase = nil, -- index of testcase to update
@@ -33,6 +32,8 @@ function RunnerUI:new(interface, restore_winid)
 		},
 		tcdata = nil, -- table containing testcases data and results
 	}
+
+	local interface = runner.config.runner_ui.interface
 	if interface == "popup" then
 		this.interface = require("competitest.runner_ui.popup")
 	elseif interface == "split" then
@@ -112,7 +113,7 @@ function RunnerUI:show_ui()
 			return api.nvim_win_get_cursor(self.windows.tc.winid)[1]
 		end
 
-		-- kill process keymap
+		-- kill current process
 		for _, map in ipairs(self.runner.config.runner_ui.mappings.kill) do
 			self.windows.tc:map("n", map, function()
 				local tcindex = get_testcase_index_by_line()
@@ -121,14 +122,14 @@ function RunnerUI:show_ui()
 			end, { noremap = true })
 		end
 
-		-- kill all processes keymaps
+		-- kill all processes
 		for _, map in ipairs(self.runner.config.runner_ui.mappings.kill_all) do
 			self.windows.tc:map("n", map, function()
 				self.runner:kill_all_processes()
 			end, { noremap = true })
 		end
 
-		-- run again keymaps
+		-- run again current testcase
 		for _, map in ipairs(self.runner.config.runner_ui.mappings.run_again) do
 			self.windows.tc:map("n", map, function()
 				local tcindex = get_testcase_index_by_line()
@@ -139,7 +140,7 @@ function RunnerUI:show_ui()
 			end, { noremap = true })
 		end
 
-		-- run again all testcases keymaps
+		-- run again all testcases
 		for _, map in ipairs(self.runner.config.runner_ui.mappings.run_all_again) do
 			self.windows.tc:map("n", map, function()
 				self.runner:kill_all_processes()
@@ -149,33 +150,34 @@ function RunnerUI:show_ui()
 			end, { noremap = true })
 		end
 
+		-- toggle diff view between expected and standard output
+		for _, map in ipairs(self.runner.config.runner_ui.mappings.toggle_diff) do
+			self.windows.tc:map("n", map, function()
+				self:toggle_diff_view()
+			end, { noremap = true })
+		end
+
 		local function open_viewer(keymap, window_name) -- create a mapping to open viewer popup
 			self.windows.tc:map("n", keymap, function()
 				self:show_viewer_popup(window_name)
 			end, { noremap = true })
 		end
 
-		-- view output (stdout) in a bigger window keymaps
+		-- view output (stdout) in a bigger window
 		for _, map in ipairs(self.runner.config.runner_ui.mappings.view_stdout) do
 			open_viewer(map, "so")
 		end
-		-- view expected output in a bigger window keymaps
+		-- view expected output in a bigger window
 		for _, map in ipairs(self.runner.config.runner_ui.mappings.view_output) do
 			open_viewer(map, "eo")
 		end
-		-- view input (stdin) in a bigger window keymaps
+		-- view input (stdin) in a bigger window
 		for _, map in ipairs(self.runner.config.runner_ui.mappings.view_input) do
 			open_viewer(map, "si")
 		end
-		-- view stderr in a bigger window keymaps
+		-- view stderr in a bigger window
 		for _, map in ipairs(self.runner.config.runner_ui.mappings.view_stderr) do
 			open_viewer(map, "se")
-		end
-		-- toggle diff view in expected and slandered output
-		for _, map in ipairs(self.runner.config.runner_ui.mappings.toggle_diff) do
-			self.windows.tc:map("n", map, function()
-				self:toggle_diff_view()
-			end, { noremap = true })
 		end
 
 		self.windows.tc:on(nui_event.CursorMoved, function()
@@ -196,28 +198,28 @@ function RunnerUI:show_ui()
 		self.ui_visible = true
 	end
 
-	if self.diff_view_enabled then -- enable diff view if previously enabled
-		self.diff_view_enabled = false
+	if self.diff_view then -- enable diff view if previously enabled
+		self.diff_view = false
 		self:toggle_diff_view()
 	end
 	api.nvim_set_current_win(self.windows.tc.winid)
 end
 
---- Enable Diff view
 ---Enable or disable diffview in given window
 ---@param winid integer
 ---@param enable_diff boolean
 local function win_set_diff(winid, enable_diff)
 	api.nvim_win_call(winid, function()
 		api.nvim_command(enable_diff and "diffthis" or "diffoff")
+		vim.wo.foldlevel = 1 -- unfold unchanged text
 	end)
 end
 
 ---Toggle diffview between standard output and expected output windows
 function RunnerUI:toggle_diff_view()
-	self.diff_view_enabled = not self.diff_view_enabled
-	win_set_diff(self.windows.eo.winid, self.diff_view_enabled)
-	win_set_diff(self.windows.so.winid, self.diff_view_enabled)
+	self.diff_view = not self.diff_view
+	win_set_diff(self.windows.eo.winid, self.diff_view)
+	win_set_diff(self.windows.so.winid, self.diff_view)
 end
 
 ---Disable diffview between standard output and expected output windows
@@ -225,7 +227,6 @@ function RunnerUI:disable_diff_view()
 	win_set_diff(self.windows.eo.winid, false)
 	win_set_diff(self.windows.so.winid, false)
 end
-
 
 ---Hide RunnerUI preserving buffers, so it can be shown later
 function RunnerUI:hide_ui()
