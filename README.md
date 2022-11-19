@@ -315,7 +315,7 @@ require('competitest').setup {
 - `running_directory`: execution directory of your solutions, relatively to current file's path
 - `run_command`: configure the command used to run your solutions for every different language, see [here](#customize-compile-and-run-commands)
 - `multiple_testing`: how many testcases to run at the same time
-	- set it to `-1` if you want to run as many testcases as the number of available CPU cores at the same time
+	- set it to `-1` to make the most of the amount of available parallelism. Often the number of testcases run at the same time coincides with the number of CPUs
 	- set it to `0` if you want to run all the testcases together
 	- set it to any positive integer to run that number of testcases contemporarily
 - `maximum_time`: maximum time, in milliseconds, given to processes. If it's exceeded process will be killed
