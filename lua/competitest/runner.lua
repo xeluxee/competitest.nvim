@@ -29,7 +29,7 @@ function TCRunner:new(bufnr)
 		return { exec = exec, args = args }
 	end
 
-	local buf_cfg = config.get_config(bufnr)
+	local buf_cfg = config.get_buffer_config(bufnr)
 	local this = {
 		config = buf_cfg,
 		bufnr = bufnr,

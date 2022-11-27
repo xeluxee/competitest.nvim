@@ -27,7 +27,7 @@ function M.edit_testcase(add_testcase, tcnum)
 		tcnum = item.id
 
 		local function save_data(tc)
-			if config.get_config(bufnr).testcases_use_single_file then
+			if config.get_buffer_config(bufnr).testcases_use_single_file then
 				tctbl[tcnum] = tc
 				testcases.write_testcases_on_single_file(bufnr, tctbl)
 			else
@@ -64,7 +64,7 @@ function M.delete_testcase(tcnum)
 			return
 		end -- user chose "No"
 
-		if config.get_config(bufnr).testcases_use_single_file then
+		if config.get_buffer_config(bufnr).testcases_use_single_file then
 			tctbl[tcnum] = nil
 			testcases.write_testcases_on_single_file(bufnr, tctbl)
 		else

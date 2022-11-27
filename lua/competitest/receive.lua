@@ -1,5 +1,5 @@
 local luv = vim.loop
-local cgc = require("competitest.config").get_config
+local gbc = require("competitest.config").get_buffer_config
 local testcases = require("competitest.testcases")
 local utils = require("competitest.utils")
 local M = {}
@@ -8,7 +8,7 @@ local M = {}
 ---@param bufnr integer: buffer number
 function M.start_receiving(bufnr)
 	M.stop_receiving()
-	local cfg = cgc(bufnr)
+	local cfg = gbc(bufnr)
 	local message = ""
 	M.server = luv.new_tcp()
 	M.server:bind("127.0.0.1", cfg.companion_port)

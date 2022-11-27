@@ -29,7 +29,7 @@ function M.start_ui(bufnr, tctbl, title, send_data, restore_winid)
 		M.options.restore_winid = restore_winid
 	end
 
-	local config = require("competitest.config").get_config(M.options.bufnr)
+	local config = require("competitest.config").get_buffer_config(M.options.bufnr)
 	local vim_width, vim_height = utils.get_ui_size()
 
 	M.menu = nui_menu({

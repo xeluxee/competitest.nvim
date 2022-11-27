@@ -29,7 +29,7 @@ function M.start_ui(bufnr, tcnum, input_content, output_content, send_data, rest
 		M.options.restore_winid = restore_winid
 	end
 
-	local config = require("competitest.config").get_config(M.options.bufnr)
+	local config = require("competitest.config").get_buffer_config(M.options.bufnr)
 	local vim_width, vim_height = utils.get_ui_size()
 
 	local popup_width = math.floor(config.editor_ui.popup_width * vim_width)

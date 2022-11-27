@@ -1,6 +1,6 @@
 local api = vim.api
 local luv = vim.loop
-local cgc = require("competitest.config").get_config
+local gbc = require("competitest.config").get_buffer_config
 local utils = require("competitest.utils")
 local M = {}
 
@@ -9,7 +9,7 @@ local M = {}
 ---@return string: absolute path of testcases directory
 function M.get_testcases_path(bufnr)
 	return api.nvim_buf_call(bufnr, function()
-		return vim.fn.expand("%:p:h") .. "/" .. cgc(bufnr).testcases_directory .. "/"
+		return vim.fn.expand("%:p:h") .. "/" .. gbc(bufnr).testcases_directory .. "/"
 	end)
 end
 
@@ -18,7 +18,7 @@ end
 ---@return table: a table of tables made by two strings, input and output
 function M.load_testcases_from_single_file(bufnr)
 	local tcdir = M.get_testcases_path(bufnr)
-	local fpath = tcdir .. utils.eval_string(cgc(bufnr).testcases_single_file_format, 0, "", bufnr)
+	local fpath = tcdir .. utils.eval_string(gbc(bufnr).testcases_single_file_format, 0, "", bufnr)
 	local msg = utils.load_file_as_string(fpath) or vim.mpack.encode({})
 	return vim.mpack.decode(msg)
 end
@@ -27,7 +27,7 @@ end
 ---@param bufnr integer: buffer number
 ---@return table: a table of tables made by two strings, input and output
 function M.load_testcases_from_files(bufnr)
-	local cfg = cgc(bufnr)
+	local cfg = gbc(bufnr)
 
 	local function compute_match(inout)
 		local match = utils.eval_string(cfg.testcases_files_format, "(%d+)", inout, bufnr)
@@ -96,12 +96,12 @@ end
 function M.get_testcases(bufnr)
 	local loader1 = M.load_testcases_from_files
 	local loader2 = M.load_testcases_from_single_file
-	if cgc(bufnr).testcases_use_single_file then
+	if gbc(bufnr).testcases_use_single_file then
 		loader1, loader2 = loader2, loader1
 	end
 
 	local tctbl = loader1(bufnr)
-	if next(tctbl) == nil and cgc(bufnr).testcases_auto_detect_storage then
+	if next(tctbl) == nil and gbc(bufnr).testcases_auto_detect_storage then
 		tctbl = loader2(bufnr)
 	end
 	return tctbl
@@ -125,7 +125,7 @@ function M.write_testcases_on_single_file(bufnr, tctbl)
 	end
 
 	local tcdir = M.get_testcases_path(bufnr)
-	local fpath = tcdir .. utils.eval_string(cgc(bufnr).testcases_single_file_format, 0, "", bufnr)
+	local fpath = tcdir .. utils.eval_string(gbc(bufnr).testcases_single_file_format, 0, "", bufnr)
 	if next(tctbl) == nil then
 		if utils.does_file_exist(fpath) then
 			utils.delete_file(fpath)
@@ -151,7 +151,7 @@ function M.write_testcase_on_files(bufnr, tcnum, input, output)
 		end
 	end
 
-	local cfg = cgc(bufnr)
+	local cfg = gbc(bufnr)
 	local tcdir = M.get_testcases_path(bufnr)
 	local input_file = tcdir .. utils.eval_string(cfg.testcases_files_format, tcnum, cfg.input_name, bufnr)
 	local output_file = tcdir .. utils.eval_string(cfg.testcases_files_format, tcnum, cfg.output_name, bufnr)
