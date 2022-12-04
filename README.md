@@ -369,11 +369,8 @@ Modifiers are strings that will be replaced by something else. You can use them 
 | `$(FNAME)`    | file name |
 | `$(FNOEXT)`   | file name without extension |
 | `$(FEXT)`     | file extension |
-| `$(FTYPE)`    | file type |
 | `$(FABSPATH)` | absolute path of current file |
-| `$(FRELPATH)` | file path, relative to Neovim's current working directory |
 | `$(ABSDIR)`   | absolute path of folder that contains file |
-| `$(RELDIR)`   | path of folder that contains file, relative to Neovim's current working directory |
 | `$(TCNUM)`    | testcase number |
 | `$(INOUT)`    | it's substituted with `input_name` or `output_name` (see [configuration](#explanation)), to distinguish testcases input files from testcases output files |
 

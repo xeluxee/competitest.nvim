@@ -1,7 +1,15 @@
 local luv = vim.loop
 local M = {}
 
--- buffer dependent modifiers
+---Show a CompetiTest notification with vim.notify()
+---@param msg string: message to display
+---@param log_level string | nil: a log level among the ones available in vim.log.levels. When nil it defaults to ERROR
+function M.notify(msg, log_level)
+	vim.notify("CompetiTest.nvim: " .. msg, vim.log.levels[log_level or "ERROR"], { title = "CompetiTest" })
+end
+
+-- CompetiTest strings modifiers
+-- They can be strings or function accepting up to one argument, the absolute file path
 M.modifiers = {
 	-- $(): replace it with a dollar
 	[""] = "$",
@@ -11,44 +19,29 @@ M.modifiers = {
 		return luv.os_homedir()
 	end,
 
-	-- $(FNAME): full file name
-	["FNAME"] = function()
-		return vim.fn.expand("%:t")
+	-- $(FNAME): file name
+	["FNAME"] = function(filepath)
+		return vim.fn.fnamemodify(filepath, ":t")
 	end,
 
 	-- $(FNOEXT): file name without extension
-	["FNOEXT"] = function()
-		return vim.fn.expand("%:t:r")
+	["FNOEXT"] = function(filepath)
+		return vim.fn.fnamemodify(filepath, ":t:r")
 	end,
 
 	-- $(FEXT): file extension
-	["FEXT"] = function()
-		return vim.fn.expand("%:e")
-	end,
-
-	-- $(FTYPE): file type
-	["FTYPE"] = function()
-		return vim.bo.filetype
+	["FEXT"] = function(filepath)
+		return vim.fn.fnamemodify(filepath, ":e")
 	end,
 
 	-- $(FABSPATH): absolute path of current file
-	["FABSPATH"] = function()
-		return vim.fn.expand("%:p")
-	end,
-
-	-- $(FRELPATH): file path, relative to neovim's current working directory
-	["FRELPATH"] = function()
-		return vim.fn.expand("%")
+	["FABSPATH"] = function(filepath)
+		return filepath
 	end,
 
 	-- $(ABSDIR): absolute path of folder that contains file
-	["ABSDIR"] = function()
-		return vim.fn.expand("%:p:h")
-	end,
-
-	-- $(RELDIR): path of folder that contains file, relative to neovim's current working directory
-	["RELDIR"] = function()
-		return vim.fn.expand("%:h")
+	["ABSDIR"] = function(filepath)
+		return vim.fn.fnamemodify(filepath, ":p:h")
 	end,
 
 	-- $(TCNUM): testcase number; it will be set later
@@ -58,25 +51,17 @@ M.modifiers = {
 	["INOUT"] = nil,
 }
 
----Show a CompetiTest notification with vim.notify
----@param msg string: message to display
----@param log_level string | nil: a log level among the ones available in vim.log.levels. When nil it defaults to ERROR
-function M.notify(msg, log_level)
-	vim.notify("CompetiTest.nvim: " .. msg, vim.log.levels[log_level or "ERROR"], { title = "CompetiTest" })
-end
-
----Convert a string with dollars into a real string
+---Convert a string with CompetiTest modifiers into a formatted string
+---@param filepath string: absolute file path, to evaluate string from
 ---@param str string: the string to evaluate
----@param tcnum integer | string: test case number or identifier
----@param inout string: input or output file
----@param bufnr integer | nil: number representing the buffer in which the function should be executed
----@return string | nil: the converted string, or nil if it failed
-function M.eval_string(str, tcnum, inout, bufnr)
-	bufnr = bufnr or vim.api.nvim_get_current_buf()
-	M.modifiers["TCNUM"] = tostring(tcnum) -- testcase number
-	M.modifiers["INOUT"] = inout -- whether this file represents input or output
+---@param tcnum integer | string | nil: testcase number or identifier
+---@param inout string | nil: input or output identifier for testcase files
+---@return string | nil: the converted string, or nil on failure
+function M.eval_string(filepath, str, tcnum, inout)
+	M.modifiers["TCNUM"] = tostring(tcnum or "") -- testcase number
+	M.modifiers["INOUT"] = inout or "" -- whether this file represents input or output
 
-	local evaluated_str = ""
+	local evaluated_str = {}
 	local mod_start = 0 -- modifier starting position (0 means idle state)
 	for i = 1, #str do
 		local c = string.sub(str, i, i) -- current character
@@ -91,15 +76,15 @@ function M.eval_string(str, tcnum, inout, bufnr)
 			if c == "$" then
 				mod_start = -1 -- wait for parentheses
 			else
-				evaluated_str = evaluated_str .. c
+				table.insert(evaluated_str, c)
 			end
 		elseif mod_start ~= 0 and c == ")" then
 			local mod = string.sub(str, mod_start + 1, i - 1)
-			local rep = M.modifiers[mod] -- replacement
-			if type(rep) == "string" then
-				evaluated_str = evaluated_str .. rep
-			elseif type(rep) == "function" then
-				evaluated_str = evaluated_str .. vim.api.nvim_buf_call(bufnr, rep)
+			local replacement = M.modifiers[mod]
+			if type(replacement) == "string" then
+				table.insert(evaluated_str, replacement)
+			elseif type(replacement) == "function" then
+				table.insert(evaluated_str, replacement(filepath))
 			else
 				M.notify("eval_string: unrecognized modifier $(" .. mod .. ")")
 				return nil
@@ -108,9 +93,17 @@ function M.eval_string(str, tcnum, inout, bufnr)
 		end
 	end
 
-	M.modifiers["TCNUM"] = nil
-	M.modifiers["INOUT"] = nil
-	return evaluated_str
+	return table.concat(evaluated_str)
+end
+
+---Convert a string with CompetiTest modifiers into a formatted string, but considering the given buffer
+---@param bufnr integer: buffer number, representing the buffer to evaluate string from
+---@param str string: the string to evaluate
+---@param tcnum integer | string | nil: testcase number or identifier
+---@param inout string | nil: input or output identifier for testcase files
+---@return string | nil: the converted string, or nil on failure
+function M.buf_eval_string(bufnr, str, tcnum, inout)
+	return M.eval_string(vim.api.nvim_buf_get_name(bufnr), str, tcnum, inout)
 end
 
 ---Return true if the given file exists, otherwise false

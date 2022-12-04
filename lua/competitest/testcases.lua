@@ -18,7 +18,7 @@ end
 ---@return table: a table of tables made by two strings, input and output
 function M.load_testcases_from_single_file(bufnr)
 	local tcdir = M.get_testcases_path(bufnr)
-	local fpath = tcdir .. utils.eval_string(gbc(bufnr).testcases_single_file_format, 0, "", bufnr)
+	local fpath = tcdir .. utils.buf_eval_string(bufnr, gbc(bufnr).testcases_single_file_format, nil, nil)
 	local msg = utils.load_file_as_string(fpath) or vim.mpack.encode({})
 	return vim.mpack.decode(msg)
 end
@@ -30,10 +30,13 @@ function M.load_testcases_from_files(bufnr)
 	local cfg = gbc(bufnr)
 
 	local function compute_match(inout)
-		local match = utils.eval_string(cfg.testcases_files_format, "(%d+)", inout, bufnr)
-		match = match:gsub("([^%w])", "%%%1") -- escape pattern magic characters
-		match = match:gsub("%%%(%%%%d%%%+%%%)", "(%%d+)") -- restore (%d+) for testcase number matching
-		return "^" .. match .. "$"
+		local format_string_parts = vim.split(cfg.testcases_files_format, "$(TCNUM)", { plain = true })
+		for index, str in ipairs(format_string_parts) do
+			str = utils.buf_eval_string(bufnr, str, nil, inout)
+			str = string.gsub(str, "([^%w])", "%%%1") -- escape pattern magic characters
+			format_string_parts[index] = str
+		end
+		return "^" .. table.concat(format_string_parts, "(%d+)") .. "$"
 	end
 	local input_match = compute_match(cfg.input_name)
 	local output_match = compute_match(cfg.output_name)
@@ -125,7 +128,7 @@ function M.write_testcases_on_single_file(bufnr, tctbl)
 	end
 
 	local tcdir = M.get_testcases_path(bufnr)
-	local fpath = tcdir .. utils.eval_string(gbc(bufnr).testcases_single_file_format, 0, "", bufnr)
+	local fpath = tcdir .. utils.buf_eval_string(bufnr, gbc(bufnr).testcases_single_file_format, nil, nil)
 	if next(tctbl) == nil then
 		if utils.does_file_exist(fpath) then
 			utils.delete_file(fpath)
@@ -153,8 +156,8 @@ function M.write_testcase_on_files(bufnr, tcnum, input, output)
 
 	local cfg = gbc(bufnr)
 	local tcdir = M.get_testcases_path(bufnr)
-	local input_file = tcdir .. utils.eval_string(cfg.testcases_files_format, tcnum, cfg.input_name, bufnr)
-	local output_file = tcdir .. utils.eval_string(cfg.testcases_files_format, tcnum, cfg.output_name, bufnr)
+	local input_file = tcdir .. utils.buf_eval_string(bufnr, cfg.testcases_files_format, tcnum, cfg.input_name)
+	local output_file = tcdir .. utils.buf_eval_string(bufnr, cfg.testcases_files_format, tcnum, cfg.output_name)
 	update_file(input_file, input)
 	update_file(output_file, output)
 end
