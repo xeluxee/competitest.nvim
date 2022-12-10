@@ -46,20 +46,15 @@ M.modifiers = {
 
 	-- $(TCNUM): testcase number; it will be set later
 	["TCNUM"] = nil,
-
-	-- $(INOUT): whether it's an input or output testcase; it will be set later
-	["INOUT"] = nil,
 }
 
 ---Convert a string with CompetiTest modifiers into a formatted string
 ---@param filepath string: absolute file path, to evaluate string from
 ---@param str string: the string to evaluate
 ---@param tcnum integer | string | nil: testcase number or identifier
----@param inout string | nil: input or output identifier for testcase files
 ---@return string | nil: the converted string, or nil on failure
-function M.eval_string(filepath, str, tcnum, inout)
+function M.eval_string(filepath, str, tcnum)
 	M.modifiers["TCNUM"] = tostring(tcnum or "") -- testcase number
-	M.modifiers["INOUT"] = inout or "" -- whether this file represents input or output
 
 	local evaluated_str = {}
 	local mod_start = 0 -- modifier starting position (0 means idle state)
@@ -100,10 +95,9 @@ end
 ---@param bufnr integer: buffer number, representing the buffer to evaluate string from
 ---@param str string: the string to evaluate
 ---@param tcnum integer | string | nil: testcase number or identifier
----@param inout string | nil: input or output identifier for testcase files
 ---@return string | nil: the converted string, or nil on failure
-function M.buf_eval_string(bufnr, str, tcnum, inout)
-	return M.eval_string(vim.api.nvim_buf_get_name(bufnr), str, tcnum, inout)
+function M.buf_eval_string(bufnr, str, tcnum)
+	return M.eval_string(vim.api.nvim_buf_get_name(bufnr), str, tcnum)
 end
 
 ---Return true if the given file exists, otherwise false

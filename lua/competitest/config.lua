@@ -125,11 +125,9 @@ local default_config = {
 
 	testcases_use_single_file = false,
 	testcases_auto_detect_storage = true, -- if true auto detect storage method (single or multiple files). If both are present use the one specified in testcases_use_single_file
-	input_name = "input",
-	output_name = "output",
-	-- $(INOUT) will be substituted with input_name or output_name content
-	testcases_files_format = "$(FNOEXT)_$(INOUT)$(TCNUM).txt",
 	testcases_single_file_format = "$(FNOEXT).testcases",
+	testcases_input_file_format = "$(FNOEXT)_input$(TCNUM).txt",
+	testcases_output_file_format = "$(FNOEXT)_output$(TCNUM).txt",
 	testcases_directory = ".", -- where testcases are located, relatively to current file's path
 
 	companion_port = 27121, -- competitive companion port
@@ -145,31 +143,40 @@ function M.update_config_table(cfg_tbl, opts)
 		return vim.deepcopy(cfg_tbl or default_config)
 	end
 
-	-- check deprecated options
+	local function notify_warning(msg)
+		vim.schedule(function()
+			vim.notify("CompetiTest.nvim: " .. msg, vim.log.levels.WARN, { title = "CompetiTest" })
+		end)
+	end
+
+	-- check deprecated testcases options
+	if opts.testcases_files_format then
+		opts.testcases_input_file_format = string.gsub(opts.testcases_files_format, "%$%(INOUT%)", opts.input_name or "input")
+		opts.testcases_output_file_format = string.gsub(opts.testcases_files_format, "%$%(INOUT%)", opts.output_name or "output")
+		opts.testcases_files_format = nil
+		notify_warning("option 'testcases_files_format' has been deprecated in favour of 'testcases_input_file_format' and 'testcases_output_file_format'.")
+	end
+	if opts.input_name then
+		opts.input_name = nil
+		notify_warning("option 'input_name' has been deprecated. See 'testcases_input_file_format'.")
+	end
+	if opts.output_name then
+		opts.output_name = nil
+		notify_warning("option 'output_name' has been deprecated. See 'testcases_output_file_format'.")
+	end
+	-- check deprecated ui options
 	if opts.runner_ui then
 		for _, option in ipairs({ "total_width", "total_height" }) do
 			if opts.runner_ui[option] then
 				opts.popup_ui = opts.popup_ui or {}
 				opts.popup_ui[option] = opts.runner_ui[option]
 				opts.runner_ui[option] = nil
-				vim.schedule(function()
-					vim.notify(
-						"CompetiTest.nvim: option 'runner_ui." .. option .. "' has been deprecated in favour of 'popup_ui." .. option .. "'.",
-						vim.log.levels.WARN,
-						{ title = "CompetiTest" }
-					)
-				end)
+				notify_warning("option 'runner_ui." .. option .. "' has been deprecated in favour of 'popup_ui." .. option .. "'.")
 			end
 		end
 		if opts.runner_ui.selector_width then
 			opts.runner_ui.selector_width = nil
-			vim.schedule(function()
-				vim.notify(
-					"CompetiTest.nvim: option 'runner_ui.selector_width' has been deprecated. See 'popup_ui.layout'.",
-					vim.log.levels.WARN,
-					{ title = "CompetiTest" }
-				)
-			end)
+			notify_warning("option 'runner_ui.selector_width' has been deprecated. See 'popup_ui.layout'.")
 		end
 	end
 
@@ -215,14 +222,20 @@ function M.load_local_config(directory)
 	end
 end
 
+---Load local configuration for given directory, extending it with setup options
+---@param directory string
+---@return table: table containing local configuration, extended with setup options
+function M.load_local_config_and_extend(directory)
+	return M.update_config_table(M.current_setup, M.load_local_config(directory))
+end
+
 ---Load buffer specific configuration and store it in M.buffer_configs
 ---@param bufnr integer
 function M.load_buffer_config(bufnr)
 	local directory = vim.api.nvim_buf_call(bufnr, function()
 		return vim.fn.expand("%:p:h")
 	end)
-	local local_config = M.load_local_config(directory)
-	M.buffer_configs[bufnr] = M.update_config_table(M.current_setup, local_config)
+	M.buffer_configs[bufnr] = M.load_local_config_and_extend(directory)
 end
 
 ---Get buffer configuration

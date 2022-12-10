@@ -21,10 +21,10 @@ function TCRunner:new(bufnr)
 		if command == nil then
 			return nil
 		end
-		local exec = utils.buf_eval_string(bufnr, command.exec, nil, nil)
+		local exec = utils.buf_eval_string(bufnr, command.exec, nil)
 		local args = {}
-		for index, value in ipairs(command.args or {}) do
-			args[index] = utils.buf_eval_string(bufnr, value, nil, nil)
+		for index, arg in ipairs(command.args or {}) do
+			args[index] = utils.buf_eval_string(bufnr, arg, nil)
 		end
 		return { exec = exec, args = args }
 	end

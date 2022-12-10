@@ -74,15 +74,15 @@ To see all the available settings see [configuration](#configuration).
 
 #### Storing testcases in multiple text files
 - To store testcases in multiple text files set `testcases_use_single_file` to false
-- Files naming shall follow a rule to be recognized. Let's say your file is called `task-A.cpp`. If using the default configuration testcases associated with that file will be named `task-A_input0.txt`, `task-A_output0.txt`, `task-A_input1.txt`, `task-A_output1.txt` and so on. The counting starts from 0\
-Of course files naming can be configured: see `testcases_files_format` in [configuration](#configuration)
-- Testcases files can be put in the same folder of the source code file, but you can customize their path (see `testcases_directory` in [configuration](#configuration)).
+- Files naming shall follow a rule to be recognized. Let's say your file is called `task-A.cpp`. If using the default configuration testcases associated with that file will be named `task-A_input0.txt`, `task-A_output0.txt`, `task-A_input1.txt`, `task-A_output1.txt` and so on. The counting starts from 0
+- Of course files naming can be configured: see `testcases_input_file_format` and `testcases_output_file_format` in [configuration](#configuration)
+- Testcases files can be put in the same folder of the source code file, but you can customize their path (see `testcases_directory` in [configuration](#configuration))
 
 #### Storing testcases in a single file
 - To store testcases in a single file set `testcases_use_single_file` to true
-- Testcases file naming shall follow a rule to be recognized. Let's say your file is called `task-A.cpp`. If using the default configuration testcases file will be named `task-A.testcases`.
-Of course single file naming can be configured: see `testcases_single_file_format` in [configuration](#configuration)
-- Testcases file can be put in the same folder of the source code file, but you can customize its path (see `testcases_directory` in [configuration](#configuration)).
+- Testcases file naming shall follow a rule to be recognized. Let's say your file is called `task-A.cpp`. If using the default configuration testcases file will be named `task-A.testcases`
+- Of course single file naming can be configured: see `testcases_single_file_format` in [configuration](#configuration)
+- Testcases file can be put in the same folder of the source code file, but you can customize its path (see `testcases_directory` in [configuration](#configuration))
 
 Anyway you can forget about these rules if you use `:CompetiTestAdd` and `:CompetiTestEdit`, that handle these things for you.
 
@@ -248,10 +248,9 @@ require('competitest').setup {
 	testcases_directory = ".",
 	testcases_use_single_file = false,
 	testcases_auto_detect_storage = true,
-	input_name = "input",
-	output_name = "output",
-	testcases_files_format = "$(FNOEXT)_$(INOUT)$(TCNUM).txt",
 	testcases_single_file_format = "$(FNOEXT).testcases",
+	testcases_input_file_format = "$(FNOEXT)_input$(TCNUM).txt",
+	testcases_output_file_format = "$(FNOEXT)_output$(TCNUM).txt",
 
 	companion_port = 27121,
 	receive_print_message = true,
@@ -338,10 +337,9 @@ require('competitest').setup {
 - `testcases_directory`: where testcases files are located, relatively to current file's path
 - `testcases_use_single_file`: if true testcases will be stored in a single file instead of using multiple text files. If you want to change the way already existing testcases are stored see [conversion](#convert-testcases)
 - `testcases_auto_detect_storage`: if true testcases storage method will be detected automatically. When both text files and single file are available, testcases will be loaded according to the preference specified in `testcases_use_single_file`
-- `input_name`: the string substituted to `$(INOUT)` (see [modifiers](#available-modifiers)), used to name input files
-- `output_name`: the string substituted to `$(INOUT)` (see [modifiers](#available-modifiers)), used to name output files
-- `testcases_files_format`: string representing how testcases files should be named (see [modifiers](#available-modifiers))
 - `testcases_single_file_format`: string representing how single testcases files should be named (see [modifiers](#available-modifiers))
+- `testcases_input_file_format`: string representing how testcases input files should be named (see [modifiers](#available-modifiers))
+- `testcases_output_file_format`: string representing how testcases output files should be named (see [modifiers](#available-modifiers))
 - `companion_port`: competitive companion port number
 - `receive_print_message`: if true notify user that plugin is ready to receive testcases or that testcases have just been received
 
@@ -353,14 +351,14 @@ You can use a different configuration for every different folder by creating a f
 return {
 	multiple_testing = 3,
 	maximum_time = 2500,
-	input_name = 'in',
-	output_name = 'ans',
-	testcases_files_format = "$(INOUT)$(TCNUM).txt",
+	testcases_input_file_format = "in_$(TCNUM).txt",
+	testcases_output_file_format = "ans_$(TCNUM).txt",
+	testcases_single_file_format =  "$(FNOEXT).tc",
 }
 ```
 
 ### Available modifiers
-Modifiers are strings that will be replaced by something else. You can use them to [define commands](#customize-compile-and-run-commands) or to customize `testcases_files_format`.
+Modifiers are strings that will be replaced by something else. You can use them to [define commands](#customize-compile-and-run-commands) or to customize testcases files naming through options `testcases_single_file_format`, `testcases_input_file_format` and `testcases_output_file_format`.
 
 | Modifier      | Meaning |
 | --------      | ------- |
@@ -372,7 +370,6 @@ Modifiers are strings that will be replaced by something else. You can use them 
 | `$(FABSPATH)` | absolute path of current file |
 | `$(ABSDIR)`   | absolute path of folder that contains file |
 | `$(TCNUM)`    | testcase number |
-| `$(INOUT)`    | it's substituted with `input_name` or `output_name` (see [configuration](#explanation)), to distinguish testcases input files from testcases output files |
 
 ### Customize compile and run commands
 Languages as C, C++, Rust, Java and Python are supported by default.\
