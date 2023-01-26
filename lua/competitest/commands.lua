@@ -2,6 +2,7 @@ local api = vim.api
 local config = require("competitest.config")
 local testcases = require("competitest.testcases")
 local utils = require("competitest.utils")
+local widgets = require("competitest.widgets")
 local M = {}
 
 ---Start testcase editor to add a new testcase or to edit a testcase that already exists
@@ -10,7 +11,7 @@ local M = {}
 function M.edit_testcase(add_testcase, tcnum)
 	local bufnr = api.nvim_get_current_buf()
 	config.load_buffer_config(bufnr) -- reload buffer configuration since it may have been updated in the meantime
-	local tctbl = testcases.get_testcases(bufnr)
+	local tctbl = testcases.buf_get_testcases(bufnr)
 	if add_testcase then
 		tcnum = 0
 		while tctbl[tcnum] do
@@ -29,17 +30,17 @@ function M.edit_testcase(add_testcase, tcnum)
 		local function save_data(tc)
 			if config.get_buffer_config(bufnr).testcases_use_single_file then
 				tctbl[tcnum] = tc
-				testcases.write_testcases_on_single_file(bufnr, tctbl)
+				testcases.single_file.buf_write(bufnr, tctbl)
 			else
-				testcases.write_testcase_on_files(bufnr, tcnum, tc.input, tc.output)
+				testcases.io_files.buf_write_pair(bufnr, tcnum, tc.input, tc.output)
 			end
 		end
 
-		require("competitest.editor").start_ui(bufnr, tcnum, tctbl[tcnum].input, tctbl[tcnum].output, save_data, api.nvim_get_current_win())
+		widgets.editor(bufnr, tcnum, tctbl[tcnum].input, tctbl[tcnum].output, save_data, api.nvim_get_current_win())
 	end
 
 	if tcnum == "" then
-		require("competitest.picker").start_ui(bufnr, tctbl, "Edit a Testcase", start_editor, api.nvim_get_current_win())
+		widgets.picker(bufnr, tctbl, "Edit a Testcase", start_editor, api.nvim_get_current_win())
 	else
 		start_editor({ id = tonumber(tcnum) })
 	end
@@ -50,7 +51,7 @@ end
 function M.delete_testcase(tcnum)
 	local bufnr = api.nvim_get_current_buf()
 	config.load_buffer_config(bufnr) -- reload buffer configuration since it may have been updated in the meantime
-	local tctbl = testcases.get_testcases(bufnr)
+	local tctbl = testcases.buf_get_testcases(bufnr)
 
 	local function delete_testcase(item) -- item.id is testcase number
 		if not tctbl[item.id] then
@@ -66,14 +67,14 @@ function M.delete_testcase(tcnum)
 
 		if config.get_buffer_config(bufnr).testcases_use_single_file then
 			tctbl[tcnum] = nil
-			testcases.write_testcases_on_single_file(bufnr, tctbl)
+			testcases.single_file.buf_write(bufnr, tctbl)
 		else
-			testcases.write_testcase_on_files(bufnr, tcnum)
+			testcases.io_files.buf_write_pair(bufnr, tcnum, nil, nil)
 		end
 	end
 
 	if tcnum == "" then
-		require("competitest.picker").start_ui(bufnr, tctbl, "Delete a Testcase", delete_testcase, api.nvim_get_current_win())
+		widgets.picker(bufnr, tctbl, "Delete a Testcase", delete_testcase, api.nvim_get_current_win())
 	else
 		delete_testcase({ id = tonumber(tcnum) })
 	end
@@ -83,9 +84,9 @@ end
 ---@param mode string: can be "singlefile_to_files", "files_to_singlefile" or "auto"
 function M.convert_testcases(mode)
 	local bufnr = api.nvim_get_current_buf()
-	local singlefile_tctbl = testcases.load_testcases_from_single_file(bufnr)
+	local singlefile_tctbl = testcases.single_file.buf_load(bufnr)
 	local no_singlefile = next(singlefile_tctbl) == nil
-	local files_tctbl = testcases.load_testcases_from_files(bufnr)
+	local files_tctbl = testcases.io_files.buf_load(bufnr)
 	local no_files = next(files_tctbl) == nil
 
 	local function convert_singlefile_to_files()
@@ -101,12 +102,10 @@ function M.convert_testcases(mode)
 		end
 
 		for tcnum, _ in pairs(files_tctbl) do -- delete already existing files
-			testcases.write_testcase_on_files(bufnr, tcnum)
+			testcases.io_files.buf_write_pair(bufnr, tcnum, nil, nil)
 		end
-		testcases.write_testcases_on_single_file(bufnr, {}) -- delete single file
-		for tcnum, tc in pairs(singlefile_tctbl) do -- create new files
-			testcases.write_testcase_on_files(bufnr, tcnum, tc.input, tc.output)
-		end
+		testcases.single_file.buf_write(bufnr, {}) -- delete single file
+		testcases.io_files.buf_write(bufnr, singlefile_tctbl) -- create new files
 	end
 
 	local function convert_files_to_singlefile()
@@ -122,9 +121,9 @@ function M.convert_testcases(mode)
 		end
 
 		for tcnum, _ in pairs(files_tctbl) do -- delete already existing files
-			testcases.write_testcase_on_files(bufnr, tcnum)
+			testcases.io_files.buf_write_pair(bufnr, tcnum, nil, nil)
 		end
-		testcases.write_testcases_on_single_file(bufnr, files_tctbl) -- create new single file
+		testcases.single_file.buf_write(bufnr, files_tctbl) -- create new single file
 	end
 
 	if mode == "singlefile_to_files" then
@@ -160,7 +159,7 @@ end
 function M.run_testcases(testcases_list, compile, only_show)
 	local bufnr = api.nvim_get_current_buf()
 	config.load_buffer_config(bufnr)
-	local tctbl = testcases.get_testcases(bufnr)
+	local tctbl = testcases.buf_get_testcases(bufnr)
 
 	if testcases_list ~= "" then
 		local new_tctbl = {}
@@ -193,10 +192,70 @@ function M.run_testcases(testcases_list, compile, only_show)
 	r:show_ui()
 end
 
-function M.receive_testcases()
-	local bufnr = api.nvim_get_current_buf()
-	config.load_buffer_config(bufnr)
-	require("competitest.receive").start_receiving(bufnr)
+---Receive testcases, problems or contests from Competitive Companion
+---@param mode string: can be "testcases", "problem" or "contest"
+function M.receive(mode)
+	local receive = require("competitest.receive")
+
+	---Utility function to store received problem following configuration
+	---@param filepath string: source file absolute path
+	---@param directory string: source file directory
+	---@param confirm_overwriting boolean: whether to ask user to overwrite an already existing file or not
+	---@param tclist table: table containing received testcases
+	---@param cfg table: table containing CompetiTest configuration
+	local function store_problem_config(filepath, directory, confirm_overwriting, tclist, cfg)
+		if confirm_overwriting and utils.does_file_exist(filepath) then
+			local choice = vim.fn.confirm('Do you want to overwrite "' .. filepath .. '"?', "&Yes\n&No")
+			if choice == 2 then
+				return
+			end -- user chose "No"
+		end
+
+		receive.store_problem(
+			filepath,
+			directory .. "/" .. cfg.testcases_directory .. "/",
+			tclist,
+			cfg.testcases_use_single_file,
+			cfg.testcases_single_file_format,
+			cfg.testcases_input_file_format,
+			cfg.testcases_output_file_format
+		)
+	end
+
+	if mode == "testcases" then
+		local bufnr = api.nvim_get_current_buf()
+		config.load_buffer_config(bufnr)
+		local bufcfg = config.get_buffer_config(bufnr)
+		receive.receive(bufcfg.companion_port, true, "testcases", function(tasks)
+			receive.store_testcases(bufnr, tasks[1].tests, bufcfg.testcases_use_single_file)
+		end)
+	elseif mode == "problem" then
+		receive.receive(config.current_setup.companion_port, true, "problem", function(tasks)
+			widgets.input("Choose problem directory", vim.fn.getcwd(), config.current_setup.floating_border, function(directory)
+				widgets.input("Choose file name", tasks[1].name .. ".cpp", config.current_setup.floating_border, function(filename)
+					local filepath = directory .. "/" .. filename
+					local cfg = config.load_local_config_and_extend(directory)
+
+					store_problem_config(filepath, directory, true, tasks[1].tests, cfg)
+				end)
+			end)
+		end)
+	elseif mode == "contest" then
+		widgets.input("Choose contest directory", vim.fn.getcwd(), config.current_setup.floating_border, function(directory)
+			widgets.input("Choose file extension", "cpp", config.current_setup.floating_border, function(file_extension)
+				receive.receive(config.current_setup.companion_port, false, "contest", function(tasks)
+					local cfg = config.load_local_config_and_extend(directory)
+
+					for _, task in ipairs(tasks) do
+						local filepath = directory .. "/" .. task.name .. "." .. file_extension
+						store_problem_config(filepath, directory, true, task.tests, cfg)
+					end
+				end)
+			end)
+		end)
+	else
+		utils.notify("receive: unrecognized mode '" .. tostring(mode) .. "'.")
+	end
 end
 
 return M

@@ -14,15 +14,18 @@ function M.setup(opts)
 		function! s:convert_command_completion(...) abort
 			return "auto\nfiles_to_singlefile\nsinglefile_to_files"
 		endfunction
+		function! s:receive_command_completion(...) abort
+			return "testcases\nproblem\ncontest"
+		endfunction
 
-		command! CompetiTestAdd lua require("competitest.commands").edit_testcase(true)
-		command! -nargs=? CompetiTestEdit lua require("competitest.commands").edit_testcase(false, <q-args>)
-		command! -nargs=? CompetiTestDelete lua require("competitest.commands").delete_testcase(<q-args>)
-		command! -nargs=1 -complete=custom,s:convert_command_completion CompetiTestConvert lua require("competitest.commands").convert_testcases(<q-args>)
-		command! -nargs=* CompetiTestRun lua require("competitest.commands").run_testcases(<q-args>, true)
-		command! -nargs=* CompetiTestRunNC lua require("competitest.commands").run_testcases(<q-args>, false)
-		command! CompetiTestRunNE lua require("competitest.commands").run_testcases(<q-args>, false, true)
-		command! CompetiTestReceive lua require("competitest.commands").receive_testcases()
+		command! -bar CompetiTestAdd lua require("competitest.commands").edit_testcase(true)
+		command! -bar -nargs=? CompetiTestEdit lua require("competitest.commands").edit_testcase(false, <q-args>)
+		command! -bar -nargs=? CompetiTestDelete lua require("competitest.commands").delete_testcase(<q-args>)
+		command! -bar -nargs=1 -complete=custom,s:convert_command_completion CompetiTestConvert lua require("competitest.commands").convert_testcases(<q-args>)
+		command! -bar -nargs=* CompetiTestRun lua require("competitest.commands").run_testcases(<q-args>, true)
+		command! -bar -nargs=* CompetiTestRunNC lua require("competitest.commands").run_testcases(<q-args>, false)
+		command! -bar CompetiTestRunNE lua require("competitest.commands").run_testcases(<q-args>, false, true)
+		command! -bar -nargs=1 -complete=custom,s:receive_command_completion CompetiTestReceive lua require("competitest.commands").receive(<q-args>)
 		]])
 
 		-- create highlight groups
@@ -37,8 +40,7 @@ end
 ---Resize CompetiTest user interface if visible
 function M.resize_ui()
 	vim.schedule(function()
-		require("competitest.editor").start_ui("resized")
-		require("competitest.picker").start_ui("resized")
+		require("competitest.widgets").resize_widgets()
 		for _, r in pairs(require("competitest.commands").runners) do
 			r:resize_ui()
 		end

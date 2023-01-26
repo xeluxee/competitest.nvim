@@ -27,10 +27,11 @@
 - [Edit](#add-or-edit-a-testcase) a testcases with `:CompetiTestEdit`
 - [Delete](#remove-a-testcase) a testcase with `:CompetiTestDelete`
 - [Run](#run-testcases) your program across all the testcases with `:CompetiTestRun`, showing results and execution data in a nice interactive UI
-- [Download](#receive-testcases) testcases automatically from competitive programming platforms with `:CompetiTestReceive`
+- [Download](#receive-testcases-problems-and-contests) testcases, problems and contests automatically from competitive programming platforms with `:CompetiTestReceive`
 - View diff between actual and expected output
 - [Customizable interface](#customize-ui-layout) that resizes automatically when Neovim window is resized
-- Customizable highlight groups. See [Highlights](#highlights)
+- Integration with [statusline and winbar](#statusline-and-winbar-integration)
+- Customizable [highlight groups](#highlights)
 
 ## Installation
 **NOTE:** this plugins requires Neovim ≥ 0.5
@@ -129,12 +130,17 @@ If you have previously closed the UI and you want to re-open it without re-execu
 
 Of course all these keybindings can be customized: see `runner_ui` ➤ `mappings` in [configuration](#configuration)
 
-### Receive testcases
+### Receive testcases, problems and contests
 **NOTE:** to get this feature working you need to install [competitive-companion](https://github.com/jmerle/competitive-companion) extension in your browser.
 
-Launch `:CompetiTestReceive` to fetch testcases from competitive programming platforms. After launching this command click on the green plus button in your browser to download testcases: they will be received and stored automatically by CompetiTest.
+Thanks to its integration with [competitive-companion](https://github.com/jmerle/competitive-companion), CompetiTest can download contents from competitive programming platforms:
+- Download only testcases with `:CompetiTestReceive testcases`
+- Download a problem with `:CompetiTestReceive problem` (source file is automatically created along with testcases)
+- Download an entire contest with `:CompetiTestReceive contest` (make sure to be on the homepage of the contest, not of a single problem)
 
-For further customization see `companion_port` and `receive_print_message` in [configuration](#configuration)
+After launching one of these commands click on the green plus button in your browser to start downloading.
+
+For further customization see `companion_port` and `receive_print_message` in [configuration](#configuration).
 
 ## Configuration
 ### Full configuration
@@ -341,7 +347,7 @@ require('competitest').setup {
 - `testcases_input_file_format`: string representing how testcases input files should be named (see [modifiers](#available-modifiers))
 - `testcases_output_file_format`: string representing how testcases output files should be named (see [modifiers](#available-modifiers))
 - `companion_port`: competitive companion port number
-- `receive_print_message`: if true notify user that plugin is ready to receive testcases or that testcases have just been received
+- `receive_print_message`: if true notify user that plugin is ready to receive testcases, problems and contests or that they have just been received
 
 
 ### Local configuration
@@ -353,7 +359,7 @@ return {
 	maximum_time = 2500,
 	testcases_input_file_format = "in_$(TCNUM).txt",
 	testcases_output_file_format = "ans_$(TCNUM).txt",
-	testcases_single_file_format =  "$(FNOEXT).tc",
+	testcases_single_file_format = "$(FNOEXT).tc",
 }
 ```
 
@@ -449,6 +455,7 @@ layout = {
 </td> </tr>
 </table>
 
+## Statusline and winbar integration
 When using split UI windows name can be displayed in statusline or in winbar. In each CompetiTest buffer there's a local variable called `competitest_title`, that is a string representing window name. You can get its value using `nvim_buf_get_var(buffer_number, 'competitest_title')`.\
 See the [second screenshot](#competitive-programming-with-neovim-made-easy) for an example statusline used with split UI.
 
@@ -480,8 +487,12 @@ hi CompetiTestWrong   ctermfg=red    guifg=#ff0000
 	- [x] Display results and execution data in a split window UI
 - [ ] Handle interactive tasks
 - [x] Configure every folder individually
-- [x] Integration with [competitive-companion](https://github.com/jmerle/competitive-companion) to download testcases automatically from competitive programming platforms
+- [x] Integration with [competitive-companion](https://github.com/jmerle/competitive-companion)
+	- [x] Download testcases
+	- [x] Download problems
+	- [x] Download contests
 - [ ] Integration with tools to submit solutions ([api-client](https://github.com/online-judge-tools/api-client) or [cpbooster](https://github.com/searleser97/cpbooster))
+- [ ] Templates for files created when receiving problems or contests
 - [ ] Write Vim docs
 - [x] Customizable highlights
 - [x] Resizable UI
@@ -493,7 +504,7 @@ Pull Requests are welcome! 🎉
 ## License
 GNU Lesser General Public License version 3 (LGPL v3) or, at your option, any later version
 
-Copyright © 2021, 2022 [xeluxee](https://github.com/xeluxee)
+Copyright © 2021-2023 [xeluxee](https://github.com/xeluxee)
 
 CompetiTest.nvim is free software: you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by

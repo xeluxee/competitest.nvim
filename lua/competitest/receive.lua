@@ -1,65 +1,87 @@
 local luv = vim.loop
-local gbc = require("competitest.config").get_buffer_config
 local testcases = require("competitest.testcases")
 local utils = require("competitest.utils")
 local M = {}
 
----Start waiting for competitive companion to send task data and save received testcases
----@param bufnr integer: buffer number
-function M.start_receiving(bufnr)
-	M.stop_receiving()
-	local cfg = gbc(bufnr)
-	local message = ""
-	M.server = luv.new_tcp()
-	M.server:bind("127.0.0.1", cfg.companion_port)
-	M.server:listen(128, function(err)
+---Wait for competitive companion to send tasks data
+---@param port integer: competitive companion port to listen on
+---@param single_task boolean: whether to parse a single task or all tasks
+---@param notify string | nil: if not nil notify user when receiving data. It specifies what content is received: can be "testcases", "problem" or "contest"
+---@param callback function: function called after data is received, accepting list of tasks as argument
+function M.receive(port, single_task, notify, callback)
+	local tasks = {} -- table with tasks data
+	local server, client, timer
+
+	---Stop listening to competitive companion port
+	local function stop_receiving()
+		if client and not client:is_closing() then
+			client:shutdown()
+			client:close()
+		end
+		if server and not server:is_closing() then
+			server:shutdown()
+			server:close()
+		end
+		if timer and not timer:is_closing() then
+			timer:stop()
+			timer:close()
+		end
+
+		vim.schedule(function()
+			if notify then
+				utils.notify(notify .. " received successfully!", "INFO")
+			end
+			callback(tasks)
+		end)
+	end
+
+	local message = {} -- received string
+	local tasks_number = single_task and 1 or nil -- if nil download all tasks
+	server = luv.new_tcp()
+	server:bind("127.0.0.1", port)
+	server:listen(128, function(err)
 		assert(not err, err)
-		M.client = luv.new_tcp()
-		M.server:accept(M.client)
-		M.client:read_start(function(error, chunk)
+		client = luv.new_tcp()
+		server:accept(client)
+		client:read_start(function(error, chunk)
 			assert(not error, error)
 			if chunk then
-				message = message .. chunk
+				table.insert(message, chunk)
 			else
-				M.stop_receiving()
-
-				message = vim.split(message, "\r\n")
-				message = message[#message]
-				local task = vim.json.decode(message)
-
-				vim.schedule(function()
-					if cfg.receive_print_message then
-						utils.notify("testcases received successfully!", "INFO")
-					end
-					M.store_testcases(bufnr, task.tests, cfg.testcases_use_single_file)
-				end)
+				message = string.match(table.concat(message), "^.+\r\n(.+)$") -- last line, text after last \r\n
+				message = vim.json.decode(message)
+				table.insert(tasks, message)
+				tasks_number = tasks_number or message.batch.size
+				tasks_number = tasks_number - 1
+				if tasks_number == 0 then
+					stop_receiving()
+				end
+				message = {}
 			end
 		end)
 	end)
 
 	-- if after 100 seconds nothing happened stop listening
-	M.timer = luv.new_timer()
-	M.timer:start(100000, 0, function()
-		M.stop_receiving()
-	end)
+	timer = luv.new_timer()
+	timer:start(100000, 0, stop_receiving)
 
-	if cfg.receive_print_message then
-		utils.notify("ready to receive testcases. Press the green plus button in your browser.", "INFO")
+	if notify then
+		utils.notify("ready to receive " .. notify .. ". Press the green plus button in your browser.", "INFO")
 	end
 end
 
 ---Utility function to store received testcases
 ---@param bufnr integer: buffer number
----@param tclist table: table containing testcases
+---@param tclist table: table containing received testcases
 ---@param use_single_file boolean: whether to store testcases in a single file or not
 function M.store_testcases(bufnr, tclist, use_single_file)
-	local tctbl = testcases.get_testcases(bufnr)
+	local tctbl = testcases.buf_get_testcases(bufnr)
 	if next(tctbl) ~= nil then
 		local choice = vim.fn.confirm("Some testcases already exist. Do you want to keep them along the new ones?", "&Keep\n&Replace\n&Cancel")
 		if choice == 2 then -- user chose "Replace"
 			if not use_single_file then
 				for tcnum, _ in pairs(tctbl) do -- delete existing files
-					testcases.write_testcase_on_files(bufnr, tcnum)
+					testcases.io_files.buf_write_pair(bufnr, tcnum, nil, nil)
 				end
 			end
 			tctbl = {}
@@ -77,28 +99,33 @@ function M.store_testcases(bufnr, tclist, use_single_file)
 		tcindex = tcindex + 1
 	end
 
-	if use_single_file then
-		testcases.write_testcases_on_single_file(bufnr, tctbl)
-	else
-		for tcnum, tc in pairs(tctbl) do
-			testcases.write_testcase_on_files(bufnr, tcnum, tc.input, tc.output)
-		end
-	end
+	testcases.buf_write_testcases(bufnr, tctbl, use_single_file)
 end
 
----Stop listening to competitive companion port
-function M.stop_receiving()
-	if M.client and not M.client:is_closing() then
-		M.client:shutdown()
-		M.client:close()
+---Utility function to store received problem (source file and testcases)
+---@param filepath string: source file absolute path
+---@param tcdir string: directory where testcases files will be stored
+---@param tclist table: table containing received testcases
+---@param use_single_file boolean: whether to store testcases in a single file or not
+---@param single_file_format string: string with CompetiTest modifiers to match single testcases file name
+---@param input_file_format string: string with CompetiTest modifiers to match input files name
+---@param output_file_format string: string with CompetiTest modifiers to match output files name
+function M.store_problem(filepath, tcdir, tclist, use_single_file, single_file_format, input_file_format, output_file_format)
+	utils.write_string_on_file(filepath, "")
+
+	local tctbl = {}
+	local tcindex = 0
+	-- convert tclist into a 0-indexed testcases table
+	for _, tc in ipairs(tclist) do
+		tctbl[tcindex] = tc
+		tcindex = tcindex + 1
 	end
-	if M.server and not M.server:is_closing() then
-		M.server:shutdown()
-		M.server:close()
-	end
-	if M.timer and not M.timer:is_closing() then
-		M.timer:stop()
-		M.timer:close()
+
+	if use_single_file then
+		local single_file_path = tcdir .. utils.eval_string(filepath, single_file_format, nil)
+		testcases.single_file.write(single_file_path, tctbl)
+	else
+		testcases.io_files.write_eval_format_string(tcdir, tctbl, filepath, input_file_format, output_file_format)
 	end
 end
 

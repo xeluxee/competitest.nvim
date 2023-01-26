@@ -100,14 +100,14 @@ function M.buf_eval_string(bufnr, str, tcnum)
 	return M.eval_string(vim.api.nvim_buf_get_name(bufnr), str, tcnum)
 end
 
----Return true if the given file exists, otherwise false
+---Returns true if the given file exists, false otherwise
 ---@param filepath string
 ---@return boolean
 function M.does_file_exist(filepath)
 	return luv.fs_stat(filepath) ~= nil
 end
 
----This function returns the content of the specified file as a string, or nil if the given path is invalid
+---Returns the content of the specified file as a string, or nil if the given path is invalid
 ---@param filepath string
 ---@return string | nil
 function M.load_file_as_string(filepath)

@@ -154,7 +154,9 @@ function M.update_config_table(cfg_tbl, opts)
 		opts.testcases_input_file_format = string.gsub(opts.testcases_files_format, "%$%(INOUT%)", opts.input_name or "input")
 		opts.testcases_output_file_format = string.gsub(opts.testcases_files_format, "%$%(INOUT%)", opts.output_name or "output")
 		opts.testcases_files_format = nil
-		notify_warning("option 'testcases_files_format' has been deprecated in favour of 'testcases_input_file_format' and 'testcases_output_file_format'.")
+		notify_warning(
+			"option 'testcases_files_format' has been deprecated in favour of 'testcases_input_file_format' and 'testcases_output_file_format'."
+		)
 	end
 	if opts.input_name then
 		opts.input_name = nil
@@ -240,7 +242,7 @@ end
 
 ---Get buffer configuration
 ---@param bufnr integer: buffer number
----@return table: a table with buffer configuration
+---@return table: table containing buffer configuration
 function M.get_buffer_config(bufnr)
 	if not M.buffer_configs[bufnr] then
 		M.load_buffer_config(bufnr)
