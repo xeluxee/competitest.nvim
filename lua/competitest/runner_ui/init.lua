@@ -310,9 +310,9 @@ function RunnerUI:show_viewer_popup(window_name)
 		self.viewer_initialized = true
 		self.viewer_visible = true
 	elseif not self.viewer_visible then
+		self.windows.vw.bufnr = get_viewer_buffer()
 		self.windows.vw:show()
 		self.windows.vw.border:set_text("top", get_viewer_popup_title(), "center")
-		api.nvim_win_set_buf(self.windows.vw.winid, get_viewer_buffer())
 		self.viewer_visible = true
 	end
 	api.nvim_set_current_win(self.windows.vw.winid)
