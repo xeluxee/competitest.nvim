@@ -1,8 +1,37 @@
 local api = vim.api
 local utils = require("competitest.utils")
 local M = {}
+local event = require("nui.utils.autocmd").event
 
 local editor = {} -- testcase editor data
+
+local function get_buf_text(buf)
+	return table.concat(api.nvim_buf_get_lines(buf, 0, -1, false), "\n")
+end
+
+local function make_write_autocmd(input, output, callback)
+	local function handleWrite()
+		if callback ~= nil then
+			editor.callback({
+				input = get_buf_text(input.bufnr),
+				output = get_buf_text(output.bufnr),
+			})
+		end
+		vim.api.nvim_buf_set_option(input.bufnr, "modified", false)
+		vim.api.nvim_buf_set_option(output.bufnr, "modified", false)
+	end
+	input:on(event.BufWriteCmd, handleWrite)
+	output:on(event.BufWriteCmd, handleWrite)
+end
+
+local function make_quit_autocommand(input, output)
+	local function handleQuit()
+		input:unmount()
+		output:unmount()
+	end
+	input:on("QuitPre", handleQuit)
+	output:on("QuitPre", handleQuit)
+end
 
 ---Open testcase editor UI with input and output windows
 ---@param bufnr integer | nil: buffer number, or nil to resize UI
@@ -17,9 +46,6 @@ function M.editor(bufnr, tcnum, input_content, output_content, callback, restore
 			api.nvim_command("stopinsert")
 		end
 		if send and callback ~= nil then
-			local function get_buf_text(buf)
-				return table.concat(api.nvim_buf_get_lines(buf, 0, -1, false), "\n")
-			end
 			editor.callback({
 				input = get_buf_text(editor.input_popup.bufnr),
 				output = get_buf_text(editor.output_popup.bufnr),
@@ -76,6 +102,7 @@ function M.editor(bufnr, tcnum, input_content, output_content, callback, restore
 			modifiable = true,
 			readonly = false,
 			filetype = "CompetiTest",
+			buftype = "acwrite",
 		},
 		win_options = {
 			number = config.editor_ui.show_nu,
@@ -89,6 +116,9 @@ function M.editor(bufnr, tcnum, input_content, output_content, callback, restore
 	output_popup_settings.border.text.top = " Output " .. editor.tcnum
 	output_popup_settings.position.col = math.floor(vim_width / 2) + 1
 	editor.output_popup = nui_popup(output_popup_settings)
+
+	make_write_autocmd(editor.input_popup, editor.output_popup, callback)
+	make_quit_autocommand(editor.input_popup, editor.output_popup)
 
 	-- mount/open the component
 	editor.output_popup:mount()
