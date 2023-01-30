@@ -258,6 +258,8 @@ require('competitest').setup {
 	testcases_input_file_format = "$(FNOEXT)_input$(TCNUM).txt",
 	testcases_output_file_format = "$(FNOEXT)_output$(TCNUM).txt",
 
+	template_file = "~/.config/competitest/template.$(FEXT)",
+
 	companion_port = 27121,
 	receive_print_message = true,
 }
@@ -492,7 +494,7 @@ hi CompetiTestWrong   ctermfg=red    guifg=#ff0000
 	- [x] Download problems
 	- [x] Download contests
 - [ ] Integration with tools to submit solutions ([api-client](https://github.com/online-judge-tools/api-client) or [cpbooster](https://github.com/searleser97/cpbooster))
-- [ ] Templates for files created when receiving problems or contests
+- [x] Templates for files created when receiving problems or contests
 - [ ] Write Vim docs
 - [x] Customizable highlights
 - [x] Resizable UI
