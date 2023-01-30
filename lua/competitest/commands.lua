@@ -218,7 +218,8 @@ function M.receive(mode)
 			cfg.testcases_use_single_file,
 			cfg.testcases_single_file_format,
 			cfg.testcases_input_file_format,
-			cfg.testcases_output_file_format
+			cfg.testcases_output_file_format,
+			cfg.template_file
 		)
 	end
 
