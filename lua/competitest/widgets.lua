@@ -98,13 +98,6 @@ function M.editor(bufnr, tcnum, input_content, output_content, callback, restore
 	output_popup_settings.position.col = math.floor(vim_width / 2) + 1
 	editor.output_popup = nui_popup(output_popup_settings)
 
-	-- autocommands for writing testcase with ":w", closing UI with ":q" and doing both with ":wq"
-	local nui_event = require("nui.utils.autocmd").event
-	editor.input_popup:on(nui_event.BufWriteCmd, send_data)
-	editor.output_popup:on(nui_event.BufWriteCmd, send_data)
-	editor.input_popup:on(nui_event.QuitPre, delete_ui)
-	editor.output_popup:on(nui_event.QuitPre, delete_ui)
-
 	-- mount/open the component
 	editor.output_popup:mount()
 	api.nvim_buf_set_name(editor.output_popup.bufnr, "CompetiTestEditOutput")
@@ -154,6 +147,13 @@ function M.editor(bufnr, tcnum, input_content, output_content, callback, restore
 	set_popup_keymaps(editor.input_popup, "i", config.editor_ui.insert_mode_mappings, editor.output_popup.winid)
 	set_popup_keymaps(editor.output_popup, "n", config.editor_ui.normal_mode_mappings, editor.input_popup.winid)
 	set_popup_keymaps(editor.output_popup, "i", config.editor_ui.insert_mode_mappings, editor.input_popup.winid)
+
+	-- autocommands for writing testcase with ":w", closing UI with ":q" and doing both with ":wq"
+	local nui_event = require("nui.utils.autocmd").event
+	editor.input_popup:on(nui_event.BufWriteCmd, send_data)
+	editor.output_popup:on(nui_event.BufWriteCmd, send_data)
+	editor.input_popup:on(nui_event.WinClosed, delete_ui)
+	editor.output_popup:on(nui_event.WinClosed, delete_ui)
 
 	-- set content
 	api.nvim_buf_set_lines(editor.input_popup.bufnr, 0, 1, false, input_content)
