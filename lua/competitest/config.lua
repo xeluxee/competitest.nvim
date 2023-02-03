@@ -101,6 +101,10 @@ local default_config = {
 		},
 	},
 
+	use_flexible_directories = false,
+	default_language_ext = "cpp",
+	contests_directory = "~/dox/contests",
+
 	save_current_file = true,
 	save_all_files = false,
 	compile_directory = ".", -- working directory of compile_command, relatively to current file's path

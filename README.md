@@ -229,6 +229,10 @@ require('competitest').setup {
 		},
 	},
 
+	use_flexible_directories = false,
+	default_language_ext = "cpp",
+	contests_directory = "~/dox/contests",
+
 	save_current_file = true,
 	save_all_files = false,
 	compile_directory = ".",
@@ -313,6 +317,9 @@ require('competitest').setup {
 	- `vertical_layout`: a table describing vertical split UI layout. For further details see [here](#customize-ui-layout)
 	- `total_height`: a value from 0 to 1, representing the ratio between total **horizontal** split height and relative window height
 	- `horizontal_layout`: a table describing horizontal split UI layout. For further details see [here](#customize-ui-layout)
+- `use_flexible_directories`: whether to prompt the user for file path everytime or use `contests_directory` setting
+- `default_language_ext`: when `use_flexible_directories` is enabled, use this extension for new files created
+- `contests_directory`: when `use_flexible_directories` is enabled, this specifies where to output contest directory
 - `save_current_file`: if true save current file before running testcases
 - `save_all_files`: if true save all the opened files before running testcases
 - `compile_directory`: execution directory of compiler, relatively to current file's path

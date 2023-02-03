@@ -231,28 +231,80 @@ function M.receive(mode)
 		end)
 	elseif mode == "problem" then
 		receive.receive(config.current_setup.companion_port, true, "problem", function(tasks)
-			widgets.input("Choose problem directory", vim.fn.getcwd(), config.current_setup.floating_border, function(directory)
-				widgets.input("Choose file name", tasks[1].name .. ".cpp", config.current_setup.floating_border, function(filename)
-					local filepath = directory .. "/" .. filename
-					local cfg = config.load_local_config_and_extend(directory)
+			if config.current_setup.use_flexible_directories then
+				widgets.input("Choose problem directory", vim.fn.getcwd(), config.current_setup.floating_border, function(directory)
+					widgets.input("Choose file name", tasks[1].name .. ".cpp", config.current_setup.floating_border, function(filename)
+						local filepath = directory .. "/" .. filename
+						local cfg = config.load_local_config_and_extend(directory)
 
-					store_problem_config(filepath, directory, true, tasks[1].tests, cfg)
+						store_problem_config(filepath, directory, true, tasks[1].tests, cfg)
+					end)
 				end)
-			end)
+			else
+				local group = tasks[1].group
+				group = vim.fs.normalize(group)
+				group = group:gsub(" ", "")
+				group = group:gsub("%.", "")
+				group = group:gsub("#", "")
+
+				local directory = config.current_setup.contests_directory .. "/" .. group
+				directory = vim.fs.normalize(directory)
+				utils.create_directory(directory)
+
+				local filename = tasks[1].name
+				filename = filename:gsub("%.", "")
+				filename = filename .. "." .. config.current_setup.default_language_ext
+				filename = filename:gsub(" ", "_")
+				local filepath = directory .. "/" .. filename
+
+				filepath = vim.fs.normalize(filepath)
+
+				local cfg = config.load_local_config_and_extend(config.current_setup.contests_directory)
+
+				store_problem_config(filepath, directory, true, tasks[1].tests, cfg)
+			end
 		end)
 	elseif mode == "contest" then
-		widgets.input("Choose contest directory", vim.fn.getcwd(), config.current_setup.floating_border, function(directory)
-			widgets.input("Choose file extension", "cpp", config.current_setup.floating_border, function(file_extension)
-				receive.receive(config.current_setup.companion_port, false, "contest", function(tasks)
-					local cfg = config.load_local_config_and_extend(directory)
+		if config.current_setup.use_flexible_directories then
+			widgets.input("Choose contest directory", vim.fn.getcwd(), config.current_setup.floating_border, function(directory)
+				widgets.input("Choose file extension", "cpp", config.current_setup.floating_border, function(file_extension)
+					receive.receive(config.current_setup.companion_port, false, "contest", function(tasks)
+						local cfg = config.load_local_config_and_extend(directory)
 
-					for _, task in ipairs(tasks) do
-						local filepath = directory .. "/" .. task.name .. "." .. file_extension
-						store_problem_config(filepath, directory, true, task.tests, cfg)
-					end
+						for _, task in ipairs(tasks) do
+							local filepath = directory .. "/" .. task.name .. "." .. file_extension
+							store_problem_config(filepath, directory, true, task.tests, cfg)
+						end
+					end)
 				end)
 			end)
-		end)
+		else
+			receive.receive(config.current_setup.companion_port, false, "contest", function(tasks)
+				local group = tasks[1].group
+				group = vim.fs.normalize(group)
+				group = group:gsub(" ", "")
+				group = group:gsub("%.", "")
+				group = group:gsub("#", "")
+
+				local directory = config.current_setup.contests_directory .. "/" .. group
+				directory = vim.fs.normalize(directory)
+				utils.create_directory(directory)
+
+				local cfg = config.load_local_config_and_extend(directory)
+
+				for _, task in ipairs(tasks) do
+					local filename = task.name
+					filename = filename:gsub("%.", "")
+					filename = filename .. "." .. config.current_setup.default_language_ext
+					filename = filename:gsub(" ", "_")
+					local filepath = directory .. "/" .. filename
+
+					filepath = vim.fs.normalize(filepath)
+
+					store_problem_config(filepath, directory, true, task.tests, cfg)
+				end
+			end)
+		end
 	else
 		utils.notify("receive: unrecognized mode '" .. tostring(mode) .. "'.")
 	end
