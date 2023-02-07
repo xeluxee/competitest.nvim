@@ -220,10 +220,12 @@ end
 ---@param winid integer
 ---@param enable_diff boolean
 local function win_set_diff(winid, enable_diff)
-	api.nvim_win_call(winid, function()
-		api.nvim_command(enable_diff and "diffthis" or "diffoff")
-		vim.wo.foldlevel = 1 -- unfold unchanged text
-	end)
+	if winid and api.nvim_win_is_valid(winid) then
+		api.nvim_win_call(winid, function()
+			api.nvim_command(enable_diff and "diffthis" or "diffoff")
+			vim.wo.foldlevel = 1 -- unfold unchanged text
+		end)
+	end
 end
 
 ---Toggle diffview between standard output and expected output windows
