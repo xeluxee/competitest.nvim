@@ -93,7 +93,7 @@ When launching the following commands make sure the focused buffer is the one co
 Launch `:CompetiTestAdd` to add a new testcase.\
 Launch `:CompetiTestEdit` to edit an existing testcase. If you want to specify testcase number directly in the command line you can use `:CompetiTestEdit x`, where `x` is a number representing the testcase you want to edit.
 
-To jump between input and output windows press either `<C-h>`, `<C-l>`, or `<C-i>`. To save and close testcase editor press `<C-s>`.
+To jump between input and output windows press either `<C-h>`, `<C-l>`, or `<C-i>`. To save and close testcase editor press `<C-s>` or `:wq`.
 
 Of course these keybindings can be customized: see `editor_ui` ➤ `normal_mode_mappings` and `editor_ui` ➤ `insert_mode_mappings` in [configuration](#configuration)
 
@@ -111,7 +111,7 @@ One of the following arguments is needed:
 **NOTE:** this command only converts already existing testcases files without changing CompetiTest configuration. To choose the storage method to use you have to [configure](#configuration) `testcases_use_single_file` option, that is false by default. Anyway storage method can be automatically detected when option `testcases_auto_detect_storage` is true.
 
 ### Run testcases
-Launch `:CompetiTestRun`. CompetiTest's interface will appear and you'll be able to view details about a testcase by moving the cursor over its entry. You can close the UI by pressing `q` or `Q`.\
+Launch `:CompetiTestRun`. CompetiTest's interface will appear and you'll be able to view details about a testcase by moving the cursor over its entry. You can close the UI by pressing `q`, `Q` or `:q`.\
 If you're using a compiled language and you don't want to recompile your program launch `:CompetiTestRunNC`, where "NC" means "No Compile".\
 If you have previously closed the UI and you want to re-open it without re-executing testcases or recompiling launch `:CompetiTestRunNE`, where "NE" means "No Execute".
 
