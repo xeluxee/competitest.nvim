@@ -218,8 +218,12 @@ function M.receive(mode)
 			local extension = vim.fn.fnamemodify(filepath, ":e")
 			template_file = cfg.template_file[extension]
 		end
+
 		if template_file then
 			template_file = string.gsub(template_file, "^%~", vim.loop.os_homedir()) -- expand tilde into home directory
+			if type(cfg.template_file) == "table" and not utils.does_file_exist(template_file) then -- check if file exists when path is explicitly set
+				utils.notify('template file "' .. template_file .. "\" doesn't exist.", "WARN")
+			end
 		end
 
 		receive.store_problem(
