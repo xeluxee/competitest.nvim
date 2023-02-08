@@ -211,15 +211,26 @@ function M.receive(mode)
 			end -- user chose "No"
 		end
 
+		local template_file -- template file absolute path
+		if type(cfg.template_file) == "string" then -- string with CompetiTest modifiers
+			template_file = utils.eval_string(filepath, cfg.template_file, nil)
+		elseif type(cfg.template_file) == "table" then -- table with paths to template files
+			local extension = vim.fn.fnamemodify(filepath, ":e")
+			template_file = cfg.template_file[extension]
+		end
+		if template_file then
+			template_file = string.gsub(template_file, "^%~", vim.loop.os_homedir()) -- expand tilde into home directory
+		end
+
 		receive.store_problem(
 			filepath,
+			template_file,
 			directory .. "/" .. cfg.testcases_directory .. "/",
 			tclist,
 			cfg.testcases_use_single_file,
 			cfg.testcases_single_file_format,
 			cfg.testcases_input_file_format,
-			cfg.testcases_output_file_format,
-			cfg.template_file
+			cfg.testcases_output_file_format
 		)
 	end
 

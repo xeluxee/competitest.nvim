@@ -104,16 +104,20 @@ end
 
 ---Utility function to store received problem (source file and testcases)
 ---@param filepath string: source file absolute path
+---@param template_file string | nil: template file absolute path, or nil to create empty source file
 ---@param tcdir string: directory where testcases files will be stored
 ---@param tclist table: table containing received testcases
 ---@param use_single_file boolean: whether to store testcases in a single file or not
 ---@param single_file_format string: string with CompetiTest modifiers to match single testcases file name
 ---@param input_file_format string: string with CompetiTest modifiers to match input files name
 ---@param output_file_format string: string with CompetiTest modifiers to match output files name
----@param template_file string: string with the absolute location of template file to use.
-function M.store_problem(filepath, tcdir, tclist, use_single_file, single_file_format, input_file_format, output_file_format, template_file)
-	local template = utils.load_file_as_string(vim.fs.normalize(utils.eval_string(filepath, template_file, nil)))
-	utils.write_string_on_file(filepath, template)
+function M.store_problem(filepath, template_file, tcdir, tclist, use_single_file, single_file_format, input_file_format, output_file_format)
+	if template_file and utils.does_file_exist(template_file) then
+		utils.create_directory(vim.fn.fnamemodify(filepath, ":h"))
+		luv.fs_copyfile(template_file, filepath)
+	else
+		utils.write_string_on_file(filepath, "")
+	end
 
 	local tctbl = {}
 	local tcindex = 0

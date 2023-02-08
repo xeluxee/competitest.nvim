@@ -130,10 +130,9 @@ local default_config = {
 	testcases_output_file_format = "$(FNOEXT)_output$(TCNUM).txt",
 	testcases_directory = ".", -- where testcases are located, relatively to current file's path
 
-	template_file = "~/.config/competitest/template.$(FEXT)",
-
 	companion_port = 27121, -- competitive companion port
 	receive_print_message = true,
+	template_file = false,
 }
 
 ---Return an updated configuration table with given options
