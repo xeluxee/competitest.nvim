@@ -263,7 +263,10 @@ function M.receive(mode)
 					local cfg = config.load_local_config_and_extend(directory)
 
 					for _, task in ipairs(tasks) do
-						local filepath = directory .. "/" .. task.name .. "." .. file_extension
+						local filepath = directory .. "/" .. task.name
+						if file_extension ~= "" then
+							filepath = filepath .. "." .. file_extension
+						end
 						store_problem_config(filepath, directory, true, task.tests, cfg)
 					end
 				end)
