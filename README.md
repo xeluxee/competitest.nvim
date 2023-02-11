@@ -93,7 +93,7 @@ When launching the following commands make sure the focused buffer is the one co
 Launch `:CompetiTestAdd` to add a new testcase.\
 Launch `:CompetiTestEdit` to edit an existing testcase. If you want to specify testcase number directly in the command line you can use `:CompetiTestEdit x`, where `x` is a number representing the testcase you want to edit.
 
-To jump between input and output windows press either `<C-h>`, `<C-l>`, or `<C-i>`. To save and close testcase editor press `<C-s>`.
+To jump between input and output windows press either `<C-h>`, `<C-l>`, or `<C-i>`. To save and close testcase editor press `<C-s>` or `:wq`.
 
 Of course these keybindings can be customized: see `editor_ui` ➤ `normal_mode_mappings` and `editor_ui` ➤ `insert_mode_mappings` in [configuration](#configuration)
 
@@ -111,7 +111,7 @@ One of the following arguments is needed:
 **NOTE:** this command only converts already existing testcases files without changing CompetiTest configuration. To choose the storage method to use you have to [configure](#configuration) `testcases_use_single_file` option, that is false by default. Anyway storage method can be automatically detected when option `testcases_auto_detect_storage` is true.
 
 ### Run testcases
-Launch `:CompetiTestRun`. CompetiTest's interface will appear and you'll be able to view details about a testcase by moving the cursor over its entry. You can close the UI by pressing `q` or `Q`.\
+Launch `:CompetiTestRun`. CompetiTest's interface will appear and you'll be able to view details about a testcase by moving the cursor over its entry. You can close the UI by pressing `q`, `Q` or `:q`.\
 If you're using a compiled language and you don't want to recompile your program launch `:CompetiTestRunNC`, where "NC" means "No Compile".\
 If you have previously closed the UI and you want to re-open it without re-executing testcases or recompiling launch `:CompetiTestRunNE`, where "NE" means "No Execute".
 
@@ -138,9 +138,10 @@ Thanks to its integration with [competitive-companion](https://github.com/jmerle
 - Download a problem with `:CompetiTestReceive problem` (source file is automatically created along with testcases)
 - Download an entire contest with `:CompetiTestReceive contest` (make sure to be on the homepage of the contest, not of a single problem)
 
-After launching one of these commands click on the green plus button in your browser to start downloading.
-
+After launching one of these commands click on the green plus button in your browser to start downloading.\
 For further customization see `companion_port` and `receive_print_message` in [configuration](#configuration).
+
+When downloading a problem or a contest, source code templates can be configured for different file types. See `template_file` option in [configuration](#configuration).
 
 ## Configuration
 ### Full configuration
@@ -264,6 +265,7 @@ require('competitest').setup {
 
 	companion_port = 27121,
 	receive_print_message = true,
+	template_file = false,
 }
 ```
 
@@ -355,6 +357,20 @@ require('competitest').setup {
 - `testcases_output_file_format`: string representing how testcases output files should be named (see [modifiers](#available-modifiers))
 - `companion_port`: competitive companion port number
 - `receive_print_message`: if true notify user that plugin is ready to receive testcases, problems and contests or that they have just been received
+- `template_file`: templates to use when creating source files for received problems or contests. Can be one of the following:
+	- `false`: do not use templates
+	- string with [CompetiTest modifiers](#available-modifiers): useful when templates for different file types have a regular file naming
+	``` lua
+	template_file = "~/path/to/template.$(FEXT)"
+	```
+	- table with paths: table associating file extension to template file
+	``` lua
+	template_file = {
+	  c = "~/path/to/file.c",
+	  cpp = "~/path/to/file.cpp",
+	  py = "~/path/to/file.py",
+	}
+	```
 
 
 ### Local configuration
@@ -498,8 +514,8 @@ hi CompetiTestWrong   ctermfg=red    guifg=#ff0000
 	- [x] Download testcases
 	- [x] Download problems
 	- [x] Download contests
+- [x] Templates for files created when receiving problems or contests
 - [ ] Integration with tools to submit solutions ([api-client](https://github.com/online-judge-tools/api-client) or [cpbooster](https://github.com/searleser97/cpbooster))
-- [ ] Templates for files created when receiving problems or contests
 - [ ] Write Vim docs
 - [x] Customizable highlights
 - [x] Resizable UI

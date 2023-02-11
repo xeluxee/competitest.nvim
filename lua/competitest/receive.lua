@@ -104,14 +104,20 @@ end
 
 ---Utility function to store received problem (source file and testcases)
 ---@param filepath string: source file absolute path
+---@param template_file string | nil: template file absolute path, or nil to create empty source file
 ---@param tcdir string: directory where testcases files will be stored
 ---@param tclist table: table containing received testcases
 ---@param use_single_file boolean: whether to store testcases in a single file or not
 ---@param single_file_format string: string with CompetiTest modifiers to match single testcases file name
 ---@param input_file_format string: string with CompetiTest modifiers to match input files name
 ---@param output_file_format string: string with CompetiTest modifiers to match output files name
-function M.store_problem(filepath, tcdir, tclist, use_single_file, single_file_format, input_file_format, output_file_format)
-	utils.write_string_on_file(filepath, "")
+function M.store_problem(filepath, template_file, tcdir, tclist, use_single_file, single_file_format, input_file_format, output_file_format)
+	if template_file and utils.does_file_exist(template_file) then
+		utils.create_directory(vim.fn.fnamemodify(filepath, ":h"))
+		luv.fs_copyfile(template_file, filepath)
+	else
+		utils.write_string_on_file(filepath, "")
+	end
 
 	local tctbl = {}
 	local tcindex = 0
@@ -127,6 +133,47 @@ function M.store_problem(filepath, tcdir, tclist, use_single_file, single_file_f
 	else
 		testcases.io_files.write_eval_format_string(tcdir, tctbl, filepath, input_file_format, output_file_format)
 	end
+end
+
+---Utility function to store received problem following configuration
+---@param filepath string: source file absolute path
+---@param directory string: source file directory
+---@param confirm_overwriting boolean: whether to ask user to overwrite an already existing file or not
+---@param tclist table: table containing received testcases
+---@param cfg table: table containing CompetiTest configuration
+function M.store_problem_config(filepath, directory, confirm_overwriting, tclist, cfg)
+	if confirm_overwriting and utils.does_file_exist(filepath) then
+		local choice = vim.fn.confirm('Do you want to overwrite "' .. filepath .. '"?', "&Yes\n&No")
+		if choice == 2 then
+			return
+		end -- user chose "No"
+	end
+
+	local template_file -- template file absolute path
+	if type(cfg.template_file) == "string" then -- string with CompetiTest modifiers
+		template_file = utils.eval_string(filepath, cfg.template_file, nil)
+	elseif type(cfg.template_file) == "table" then -- table with paths to template files
+		local extension = vim.fn.fnamemodify(filepath, ":e")
+		template_file = cfg.template_file[extension]
+	end
+
+	if template_file then
+		template_file = string.gsub(template_file, "^%~", vim.loop.os_homedir()) -- expand tilde into home directory
+		if type(cfg.template_file) == "table" and not utils.does_file_exist(template_file) then -- check if file exists when path is explicitly set
+			utils.notify('template file "' .. template_file .. "\" doesn't exist.", "WARN")
+		end
+	end
+
+	M.store_problem(
+		filepath,
+		template_file,
+		directory .. "/" .. cfg.testcases_directory .. "/",
+		tclist,
+		cfg.testcases_use_single_file,
+		cfg.testcases_single_file_format,
+		cfg.testcases_input_file_format,
+		cfg.testcases_output_file_format
+	)
 end
 
 return M

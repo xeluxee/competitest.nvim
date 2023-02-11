@@ -12,11 +12,9 @@ local editor = {} -- testcase editor data
 ---@param callback function | nil: function used to send back data (new input and output content)
 ---@param restore_winid integer | nil: bring the cursor to the given window after popups are closed
 function M.editor(bufnr, tcnum, input_content, output_content, callback, restore_winid)
-	local function delete_ui(send)
-		if api.nvim_get_mode().mode == "i" then
-			api.nvim_command("stopinsert")
-		end
-		if send and callback ~= nil then
+	---Send back input and output data with callback
+	local function send_data()
+		if editor.callback then
 			local function get_buf_text(buf)
 				return table.concat(api.nvim_buf_get_lines(buf, 0, -1, false), "\n")
 			end
@@ -24,6 +22,15 @@ function M.editor(bufnr, tcnum, input_content, output_content, callback, restore
 				input = get_buf_text(editor.input_popup.bufnr),
 				output = get_buf_text(editor.output_popup.bufnr),
 			})
+		end
+		api.nvim_buf_set_option(editor.input_popup.bufnr, "modified", false)
+		api.nvim_buf_set_option(editor.output_popup.bufnr, "modified", false)
+	end
+
+	---Close testcase editor UI
+	local function delete_ui()
+		if api.nvim_get_mode().mode == "i" then
+			api.nvim_command("stopinsert")
 		end
 		editor.input_popup:unmount()
 		editor.output_popup:unmount()
@@ -37,7 +44,7 @@ function M.editor(bufnr, tcnum, input_content, output_content, callback, restore
 		end
 		input_content = api.nvim_buf_get_lines(editor.input_popup.bufnr, 0, -1, false)
 		output_content = api.nvim_buf_get_lines(editor.output_popup.bufnr, 0, -1, false)
-		delete_ui(false)
+		delete_ui()
 	else
 		editor.bufnr = bufnr
 		editor.tcnum = tcnum and tostring(tcnum) .. " " or ""
@@ -76,6 +83,7 @@ function M.editor(bufnr, tcnum, input_content, output_content, callback, restore
 			modifiable = true,
 			readonly = false,
 			filetype = "CompetiTest",
+			buftype = "acwrite",
 		},
 		win_options = {
 			number = config.editor_ui.show_nu,
@@ -122,13 +130,14 @@ function M.editor(bufnr, tcnum, input_content, output_content, callback, restore
 
 		for _, map in ipairs(k.save_and_close) do
 			p:map(m, map, function()
-				delete_ui(true)
+				send_data()
+				delete_ui()
 			end, { noremap = true })
 		end
 
 		for _, map in ipairs(k.cancel) do
 			p:map(m, map, function()
-				delete_ui(false)
+				delete_ui()
 			end, { noremap = true })
 		end
 	end
@@ -138,6 +147,13 @@ function M.editor(bufnr, tcnum, input_content, output_content, callback, restore
 	set_popup_keymaps(editor.input_popup, "i", config.editor_ui.insert_mode_mappings, editor.output_popup.winid)
 	set_popup_keymaps(editor.output_popup, "n", config.editor_ui.normal_mode_mappings, editor.input_popup.winid)
 	set_popup_keymaps(editor.output_popup, "i", config.editor_ui.insert_mode_mappings, editor.input_popup.winid)
+
+	-- autocommands for writing testcase with ":w", closing UI with ":q" and doing both with ":wq"
+	local nui_event = require("nui.utils.autocmd").event
+	editor.input_popup:on(nui_event.BufWriteCmd, send_data)
+	editor.output_popup:on(nui_event.BufWriteCmd, send_data)
+	editor.input_popup:on(nui_event.WinClosed, delete_ui)
+	editor.output_popup:on(nui_event.WinClosed, delete_ui)
 
 	-- set content
 	api.nvim_buf_set_lines(editor.input_popup.bufnr, 0, 1, false, input_content)

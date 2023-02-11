@@ -197,31 +197,6 @@ end
 function M.receive(mode)
 	local receive = require("competitest.receive")
 
-	---Utility function to store received problem following configuration
-	---@param filepath string: source file absolute path
-	---@param directory string: source file directory
-	---@param confirm_overwriting boolean: whether to ask user to overwrite an already existing file or not
-	---@param tclist table: table containing received testcases
-	---@param cfg table: table containing CompetiTest configuration
-	local function store_problem_config(filepath, directory, confirm_overwriting, tclist, cfg)
-		if confirm_overwriting and utils.does_file_exist(filepath) then
-			local choice = vim.fn.confirm('Do you want to overwrite "' .. filepath .. '"?', "&Yes\n&No")
-			if choice == 2 then
-				return
-			end -- user chose "No"
-		end
-
-		receive.store_problem(
-			filepath,
-			directory .. "/" .. cfg.testcases_directory .. "/",
-			tclist,
-			cfg.testcases_use_single_file,
-			cfg.testcases_single_file_format,
-			cfg.testcases_input_file_format,
-			cfg.testcases_output_file_format
-		)
-	end
-
 	if mode == "testcases" then
 		local bufnr = api.nvim_get_current_buf()
 		config.load_buffer_config(bufnr)
@@ -237,8 +212,7 @@ function M.receive(mode)
 						local filepath = directory .. "/" .. filename
 						local cfg = config.load_local_config_and_extend(directory)
 
-						store_problem_config(filepath, directory, true, tasks[1].tests, cfg)
-					end)
+					receive.store_problem_config(filepath, directory, true, tasks[1].tests, cfg)
 				end)
 			else
 				local group = tasks[1].group
@@ -266,16 +240,18 @@ function M.receive(mode)
 		end)
 	elseif mode == "contest" then
 		if config.current_setup.use_flexible_directories then
-			widgets.input("Choose contest directory", vim.fn.getcwd(), config.current_setup.floating_border, function(directory)
-				widgets.input("Choose file extension", "cpp", config.current_setup.floating_border, function(file_extension)
-					receive.receive(config.current_setup.companion_port, false, "contest", function(tasks)
-						local cfg = config.load_local_config_and_extend(directory)
+		widgets.input("Choose contest directory", vim.fn.getcwd(), config.current_setup.floating_border, function(directory)
+			widgets.input("Choose file extension", "cpp", config.current_setup.floating_border, function(file_extension)
+				receive.receive(config.current_setup.companion_port, false, "contest", function(tasks)
+					local cfg = config.load_local_config_and_extend(directory)
 
-						for _, task in ipairs(tasks) do
-							local filepath = directory .. "/" .. task.name .. "." .. file_extension
-							store_problem_config(filepath, directory, true, task.tests, cfg)
+					for _, task in ipairs(tasks) do
+						local filepath = directory .. "/" .. task.name
+						if file_extension ~= "" then
+							filepath = filepath .. "." .. file_extension
 						end
-					end)
+						receive.store_problem_config(filepath, directory, true, task.tests, cfg)
+					end
 				end)
 			end)
 		else

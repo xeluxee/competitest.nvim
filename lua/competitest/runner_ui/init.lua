@@ -105,6 +105,17 @@ function RunnerUI:show_ui()
 			for n, w in pairs(self.windows) do
 				if n ~= "vw" then
 					w:map("n", map, hide_ui, { noremap = true })
+
+					w:on(nui_event.QuitPre, function() -- close windows with ":q"
+						local winid -- window of buffer shown in viewer
+						if self.viewer_visible and n == self.viewer_content then
+							winid = w.winid
+						end
+						self:delete()
+						if winid and api.nvim_win_is_valid(winid) then -- workaround to close last split
+							api.nvim_buf_delete(api.nvim_win_get_buf(winid), { force = true })
+						end
+					end)
 				end
 			end
 		end
@@ -209,10 +220,12 @@ end
 ---@param winid integer
 ---@param enable_diff boolean
 local function win_set_diff(winid, enable_diff)
-	api.nvim_win_call(winid, function()
-		api.nvim_command(enable_diff and "diffthis" or "diffoff")
-		vim.wo.foldlevel = 1 -- unfold unchanged text
-	end)
+	if winid and api.nvim_win_is_valid(winid) then
+		api.nvim_win_call(winid, function()
+			api.nvim_command(enable_diff and "diffthis" or "diffoff")
+			vim.wo.foldlevel = 1 -- unfold unchanged text
+		end)
+	end
 end
 
 ---Toggle diffview between standard output and expected output windows
@@ -248,10 +261,10 @@ function RunnerUI:delete()
 	if self.ui_visible then
 		self:disable_diff_view() -- disable diff when closing windows to prevent conflicts with other diffviews
 	end
-	for _, w in pairs(self.windows) do
+	for name, w in pairs(self.windows) do
 		if w then -- if a window is uninitialized its value is nil
 			w:unmount()
-			w = nil
+			self.windows[name] = nil
 		end
 	end
 	self.ui_initialized = false
