@@ -130,7 +130,9 @@ function M.create_directory(dirpath)
 		if upper_dir ~= dirpath then
 			M.create_directory(upper_dir)
 		end
-		assert(luv.fs_mkdir(dirpath, 493), "CompetiTest.nvim: create_directory: cannot create directory '" .. dirpath .. "'")
+		if not luv.fs_opendir(dirpath) then -- handle single and double dot in paths
+			assert(luv.fs_mkdir(dirpath, 493), "CompetiTest.nvim: create_directory: cannot create directory '" .. dirpath .. "'")
+		end
 	end
 end
 

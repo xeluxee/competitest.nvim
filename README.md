@@ -138,9 +138,10 @@ Thanks to its integration with [competitive-companion](https://github.com/jmerle
 - Download a problem with `:CompetiTestReceive problem` (source file is automatically created along with testcases)
 - Download an entire contest with `:CompetiTestReceive contest` (make sure to be on the homepage of the contest, not of a single problem)
 
-After launching one of these commands click on the green plus button in your browser to start downloading.
-
+After launching one of these commands click on the green plus button in your browser to start downloading.\
 For further customization see `companion_port` and `receive_print_message` in [configuration](#configuration).
+
+When downloading a problem or a contest, source code templates can be configured for different file types. See `template_file` option in [configuration](#configuration).
 
 ## Configuration
 ### Full configuration
@@ -260,6 +261,7 @@ require('competitest').setup {
 
 	companion_port = 27121,
 	receive_print_message = true,
+	template_file = false,
 }
 ```
 
@@ -348,6 +350,20 @@ require('competitest').setup {
 - `testcases_output_file_format`: string representing how testcases output files should be named (see [modifiers](#available-modifiers))
 - `companion_port`: competitive companion port number
 - `receive_print_message`: if true notify user that plugin is ready to receive testcases, problems and contests or that they have just been received
+- `template_file`: templates to use when creating source files for received problems or contests. Can be one of the following:
+	- `false`: do not use templates
+	- string with [CompetiTest modifiers](#available-modifiers): useful when templates for different file types have a regular file naming
+	``` lua
+	template_file = "~/path/to/template.$(FEXT)"
+	```
+	- table with paths: table associating file extension to template file
+	``` lua
+	template_file = {
+	  c = "~/path/to/file.c",
+	  cpp = "~/path/to/file.cpp",
+	  py = "~/path/to/file.py",
+	}
+	```
 
 
 ### Local configuration
@@ -491,8 +507,8 @@ hi CompetiTestWrong   ctermfg=red    guifg=#ff0000
 	- [x] Download testcases
 	- [x] Download problems
 	- [x] Download contests
+- [x] Templates for files created when receiving problems or contests
 - [ ] Integration with tools to submit solutions ([api-client](https://github.com/online-judge-tools/api-client) or [cpbooster](https://github.com/searleser97/cpbooster))
-- [ ] Templates for files created when receiving problems or contests
 - [ ] Write Vim docs
 - [x] Customizable highlights
 - [x] Resizable UI

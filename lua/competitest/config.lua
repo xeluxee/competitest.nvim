@@ -132,6 +132,7 @@ local default_config = {
 
 	companion_port = 27121, -- competitive companion port
 	receive_print_message = true,
+	template_file = false,
 }
 
 ---Return an updated configuration table with given options

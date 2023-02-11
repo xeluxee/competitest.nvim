@@ -197,31 +197,6 @@ end
 function M.receive(mode)
 	local receive = require("competitest.receive")
 
-	---Utility function to store received problem following configuration
-	---@param filepath string: source file absolute path
-	---@param directory string: source file directory
-	---@param confirm_overwriting boolean: whether to ask user to overwrite an already existing file or not
-	---@param tclist table: table containing received testcases
-	---@param cfg table: table containing CompetiTest configuration
-	local function store_problem_config(filepath, directory, confirm_overwriting, tclist, cfg)
-		if confirm_overwriting and utils.does_file_exist(filepath) then
-			local choice = vim.fn.confirm('Do you want to overwrite "' .. filepath .. '"?', "&Yes\n&No")
-			if choice == 2 then
-				return
-			end -- user chose "No"
-		end
-
-		receive.store_problem(
-			filepath,
-			directory .. "/" .. cfg.testcases_directory .. "/",
-			tclist,
-			cfg.testcases_use_single_file,
-			cfg.testcases_single_file_format,
-			cfg.testcases_input_file_format,
-			cfg.testcases_output_file_format
-		)
-	end
-
 	if mode == "testcases" then
 		local bufnr = api.nvim_get_current_buf()
 		config.load_buffer_config(bufnr)
@@ -236,7 +211,7 @@ function M.receive(mode)
 					local filepath = directory .. "/" .. filename
 					local cfg = config.load_local_config_and_extend(directory)
 
-					store_problem_config(filepath, directory, true, tasks[1].tests, cfg)
+					receive.store_problem_config(filepath, directory, true, tasks[1].tests, cfg)
 				end)
 			end)
 		end)
@@ -247,8 +222,11 @@ function M.receive(mode)
 					local cfg = config.load_local_config_and_extend(directory)
 
 					for _, task in ipairs(tasks) do
-						local filepath = directory .. "/" .. task.name .. "." .. file_extension
-						store_problem_config(filepath, directory, true, task.tests, cfg)
+						local filepath = directory .. "/" .. task.name
+						if file_extension ~= "" then
+							filepath = filepath .. "." .. file_extension
+						end
+						receive.store_problem_config(filepath, directory, true, task.tests, cfg)
 					end
 				end)
 			end)
