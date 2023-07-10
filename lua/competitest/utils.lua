@@ -8,9 +8,49 @@ function M.notify(msg, log_level)
 	vim.notify("CompetiTest.nvim: " .. msg, vim.log.levels[log_level or "ERROR"], { title = "CompetiTest" })
 end
 
--- CompetiTest strings modifiers
+---Convert a string with CompetiTest modifiers into a formatted string
+---@param str string: the string to format
+---@param modifiers table: table associating modifiers name to a string or a function accepting up to one argument
+---@param argument any: argument of function modifiers
+---@return string | nil: the converted string, or nil on failure
+function M.format_string_modifiers(str, modifiers, argument)
+	local evaluated_str = {}
+	local mod_start = 0 -- modifier starting position (0 means idle state)
+	for i = 1, #str do
+		local c = string.sub(str, i, i) -- current character
+		if mod_start == -1 then -- if mod_start is -1 an opening parentheses is expected because a dollar was just encountered
+			if c == "(" then
+				mod_start = i
+			else
+				M.notify("format_string_modifiers: '$' isn't followed by '(' in the following string!\n" .. str)
+				return nil
+			end
+		elseif mod_start == 0 then
+			if c == "$" then
+				mod_start = -1 -- wait for parentheses
+			else
+				table.insert(evaluated_str, c)
+			end
+		elseif mod_start ~= 0 and c == ")" then
+			local mod = string.sub(str, mod_start + 1, i - 1)
+			local replacement = modifiers[mod]
+			if type(replacement) == "string" then
+				table.insert(evaluated_str, replacement)
+			elseif type(replacement) == "function" then
+				table.insert(evaluated_str, replacement(argument))
+			else
+				M.notify("format_string_modifiers: unrecognized modifier $(" .. mod .. ")")
+				return nil
+			end
+			mod_start = 0
+		end
+	end
+	return table.concat(evaluated_str)
+end
+
+-- CompetiTest file-format modifiers
 -- They can be strings or function accepting up to one argument, the absolute file path
-M.modifiers = {
+M.file_format_modifiers = {
 	-- $(): replace it with a dollar
 	[""] = "$",
 
@@ -48,56 +88,22 @@ M.modifiers = {
 	["TCNUM"] = nil,
 }
 
----Convert a string with CompetiTest modifiers into a formatted string
+---Convert a string with CompetiTest file-format modifiers into a formatted string
 ---@param filepath string: absolute file path, to evaluate string from
 ---@param str string: the string to evaluate
----@param tcnum integer | string | nil: testcase number or identifier
 ---@return string | nil: the converted string, or nil on failure
-function M.eval_string(filepath, str, tcnum)
-	M.modifiers["TCNUM"] = tostring(tcnum or "") -- testcase number
-
-	local evaluated_str = {}
-	local mod_start = 0 -- modifier starting position (0 means idle state)
-	for i = 1, #str do
-		local c = string.sub(str, i, i) -- current character
-		if mod_start == -1 then -- if mod_start is -1 an opening parentheses is expected because a dollar was just encountered
-			if c == "(" then
-				mod_start = i
-			else
-				M.notify("eval_string: '$' isn't followed by '(' in the following string!\n" .. str)
-				return nil
-			end
-		elseif mod_start == 0 then
-			if c == "$" then
-				mod_start = -1 -- wait for parentheses
-			else
-				table.insert(evaluated_str, c)
-			end
-		elseif mod_start ~= 0 and c == ")" then
-			local mod = string.sub(str, mod_start + 1, i - 1)
-			local replacement = M.modifiers[mod]
-			if type(replacement) == "string" then
-				table.insert(evaluated_str, replacement)
-			elseif type(replacement) == "function" then
-				table.insert(evaluated_str, replacement(filepath))
-			else
-				M.notify("eval_string: unrecognized modifier $(" .. mod .. ")")
-				return nil
-			end
-			mod_start = 0
-		end
-	end
-
-	return table.concat(evaluated_str)
+function M.eval_string(filepath, str)
+	return M.format_string_modifiers(str, M.file_format_modifiers, filepath)
 end
 
----Convert a string with CompetiTest modifiers into a formatted string, but considering the given buffer
+---Convert a string with CompetiTest file-format modifiers into a formatted string, but considering the given buffer
 ---@param bufnr integer: buffer number, representing the buffer to evaluate string from
 ---@param str string: the string to evaluate
 ---@param tcnum integer | string | nil: testcase number or identifier
 ---@return string | nil: the converted string, or nil on failure
 function M.buf_eval_string(bufnr, str, tcnum)
-	return M.eval_string(vim.api.nvim_buf_get_name(bufnr), str, tcnum)
+	M.file_format_modifiers["TCNUM"] = tostring(tcnum or "") -- testcase number
+	return M.eval_string(vim.api.nvim_buf_get_name(bufnr), str)
 end
 
 ---Returns true if the given file exists, false otherwise

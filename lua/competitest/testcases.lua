@@ -122,17 +122,17 @@ function M.io_files.write(directory, tctbl, input_file_format, output_file_forma
 	end
 end
 
----Load testcases from all the pairs of input and output files, using strings with CompetiTest modifiers to determine input and output files name
+---Load testcases from all the pairs of input and output files, using strings with CompetiTest file-format modifiers to determine input and output files name
 ---@param directory string: directory where testcases files are stored
 ---@param filepath string: absolute path of file to which testcases belong, used to evaluate format string
----@param input_file_format string: string with CompetiTest modifiers to match input files name
----@param output_file_format string: string with CompetiTest modifiers to match output files name
+---@param input_file_format string: string with CompetiTest file-format modifiers to match input files name
+---@param output_file_format string: string with CompetiTest file-format modifiers to match output files name
 ---@return table: testcases table, a table made by pairs of input and output strings
 function M.io_files.load_eval_format_string(directory, filepath, input_file_format, output_file_format)
 	local function compute_match(format)
 		local format_string_parts = vim.split(format, "$(TCNUM)", { plain = true })
 		for index, str in ipairs(format_string_parts) do
-			str = utils.eval_string(filepath, str, nil)
+			str = utils.eval_string(filepath, str)
 			if not str then
 				return nil
 			end
@@ -150,17 +150,17 @@ function M.io_files.load_eval_format_string(directory, filepath, input_file_form
 	return M.io_files.load(directory, input_file_format, output_file_format)
 end
 
----Write testcases on pairs of input and output files, using strings with CompetiTest modifiers to determine input and output files name
+---Write testcases on pairs of input and output files, using strings with CompetiTest file-format modifiers to determine input and output files name
 ---@param directory string: directory where testcases files will be stored
 ---@param tctbl table: testcases table, a table made by pairs of input and output strings
 ---@param filepath string: absolute path of file to which testcases belong, used to evaluate format string
----@param input_file_format string: string with CompetiTest modifiers to match input files name
----@param output_file_format string: string with CompetiTest modifiers to match output files name
+---@param input_file_format string: string with CompetiTest file-format modifiers to match input files name
+---@param output_file_format string: string with CompetiTest file-format modifiers to match output files name
 function M.io_files.write_eval_format_string(directory, tctbl, filepath, input_file_format, output_file_format)
 	local function compute_format(format)
 		local format_string_parts = vim.split(format, "$(TCNUM)", { plain = true })
 		for index, str in ipairs(format_string_parts) do
-			str = utils.eval_string(filepath, str, nil)
+			str = utils.eval_string(filepath, str)
 			if not str then
 				return nil
 			end
