@@ -133,6 +133,8 @@ local default_config = {
 	companion_port = 27121, -- competitive companion port
 	receive_print_message = true,
 	template_file = false,
+	received_problems_directory = false, -- whether to use flexible or fixed directories for received problems, it can be false, string or function
+	received_contests_directory = false,
 }
 
 ---Return an updated configuration table with given options

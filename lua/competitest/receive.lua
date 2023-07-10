@@ -27,7 +27,7 @@ function M.eval_receive_modifiers(str, task)
 		["CONTEST"] = contest, -- second part of group, after hyphen
 		["URL"] = task.url, -- problem url, url field
 		["MEMLIM"] = tostring(task.memoryLimit), -- available memory, memoryLimit field
-		["TIMELIM"] = tostring(task.timeLimit) -- time limit, timeLimit field
+		["TIMELIM"] = tostring(task.timeLimit), -- time limit, timeLimit field
 	}
 
 	return utils.format_string_modifiers(str, receive_modifiers)
