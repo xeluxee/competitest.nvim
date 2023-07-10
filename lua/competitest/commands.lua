@@ -222,6 +222,10 @@ function M.receive(mode)
 					local cfg = config.load_local_config_and_extend(directory)
 
 					for _, task in ipairs(tasks) do
+						if vim.fn.has("win32") == 1 then -- remove windows illegal characters from file name
+							task.name = string.gsub(task.name, '[<>:"/\\|?*]', "_")
+						end
+
 						local filepath = directory .. "/" .. task.name
 						if file_extension ~= "" then
 							filepath = filepath .. "." .. file_extension
