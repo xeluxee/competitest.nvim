@@ -231,6 +231,9 @@ function M.receive(mode)
 						local filepath = directory .. "/" .. filename
 						local cfg = config.load_local_config_and_extend(directory)
 						receive.store_problem_config(filepath, directory, true, tasks[1].tests, cfg)
+						if cfg.open_received_problems then
+							vim.cmd("edit " .. filepath)
+						end
 					end)
 				end
 			)
@@ -255,6 +258,9 @@ function M.receive(mode)
 								filepath = filepath .. "." .. file_extension
 							end
 							receive.store_problem_config(filepath, directory, true, task.tests, cfg)
+							if cfg.open_received_contests then
+								vim.cmd("edit " .. filepath)
+							end
 						end
 					end)
 				end
