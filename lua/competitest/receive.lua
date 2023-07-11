@@ -9,7 +9,7 @@ local M = {}
 ---@return string | nil: the converted string, or nil on failure
 function M.eval_receive_modifiers(str, task)
 	local judge, contest
-	local hyphen = string.find(task.group, " - ")
+	local hyphen = string.find(task.group, " - ", 1, true)
 	if not hyphen then
 		judge = task.group
 		contest = "unknown_contest"
@@ -21,7 +21,7 @@ function M.eval_receive_modifiers(str, task)
 	local receive_modifiers = {
 		[""] = "$", -- $(): replace it with a dollar
 		["HOME"] = luv.os_homedir(), -- home directory
-		["PROBLEM"] = task.name, -- Problem name, name field
+		["PROBLEM"] = task.name, -- problem name, name field
 		["GROUP"] = task.group, -- judge and contest name, group field
 		["JUDGE"] = judge, -- first part of group, before hyphen
 		["CONTEST"] = contest, -- second part of group, after hyphen
