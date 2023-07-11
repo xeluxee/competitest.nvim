@@ -226,10 +226,15 @@ function M.receive(mode)
 				"Choose problem directory",
 				get_init_dir(config.current_setup.received_problems_directory, tasks[1]),
 				config.current_setup.floating_border,
+				config.current_setup.received_problems_directory ~= false,
 				function(directory)
-					widgets.input("Choose file name", tasks[1].name .. ".cpp", config.current_setup.floating_border, function(filename)
+					local cfg = config.load_local_config_and_extend(directory)
+					local default_filename = tasks[1].name
+					if cfg.received_files_extension ~= "" then
+						default_filename = default_filename .. "." .. cfg.received_files_extension
+					end
+					widgets.input("Choose file name", default_filename, cfg.floating_border, not cfg.received_problems_prompt_filename, function(filename)
 						local filepath = directory .. "/" .. filename
-						local cfg = config.load_local_config_and_extend(directory)
 						receive.store_problem_config(filepath, directory, true, tasks[1].tests, cfg)
 						if cfg.open_received_problems then
 							vim.cmd("edit " .. filepath)
@@ -244,25 +249,31 @@ function M.receive(mode)
 				"Choose contest directory",
 				get_init_dir(config.current_setup.received_contests_directory, tasks[1]),
 				config.current_setup.floating_border,
+				config.current_setup.received_contests_directory ~= false,
 				function(directory)
-					widgets.input("Choose file extension", "cpp", config.current_setup.floating_border, function(file_extension)
-						local cfg = config.load_local_config_and_extend(directory)
+					local cfg = config.load_local_config_and_extend(directory)
+					widgets.input(
+						"Choose file extension",
+						cfg.received_files_extension,
+						cfg.floating_border,
+						not cfg.received_contests_prompt_extension,
+						function(file_extension)
+							for _, task in ipairs(tasks) do
+								if vim.fn.has("win32") == 1 then -- remove windows illegal characters from file name
+									task.name = string.gsub(task.name, '[<>:"/\\|?*]', "_")
+								end
 
-						for _, task in ipairs(tasks) do
-							if vim.fn.has("win32") == 1 then -- remove windows illegal characters from file name
-								task.name = string.gsub(task.name, '[<>:"/\\|?*]', "_")
-							end
-
-							local filepath = directory .. "/" .. task.name
-							if file_extension ~= "" then
-								filepath = filepath .. "." .. file_extension
-							end
-							receive.store_problem_config(filepath, directory, true, task.tests, cfg)
-							if cfg.open_received_contests then
-								vim.cmd("edit " .. filepath)
+								local filepath = directory .. "/" .. task.name
+								if file_extension ~= "" then
+									filepath = filepath .. "." .. file_extension
+								end
+								receive.store_problem_config(filepath, directory, true, task.tests, cfg)
+								if cfg.open_received_contests then
+									vim.cmd("edit " .. filepath)
+								end
 							end
 						end
-					end)
+					)
 				end
 			)
 		end)

@@ -245,8 +245,9 @@ local input = {}
 ---@param title string | nil: popup title, or nil to resize UI
 ---@param default_text string
 ---@param border_style string
+---@param callback_only boolean
 ---@param callback function
-function M.input(title, default_text, border_style, callback)
+function M.input(title, default_text, border_style, callback_only, callback)
 	if title == nil then -- resize UI
 		if not input.ui_visible then
 			return
@@ -254,6 +255,10 @@ function M.input(title, default_text, border_style, callback)
 		input.default_text = api.nvim_buf_get_lines(input.popup.bufnr, 0, -1, false)[1]
 		input.popup:unmount()
 	else
+		if callback_only then
+			callback(default_text)
+			return
+		end
 		input.title = title
 		input.default_text = default_text
 		input.border_style = border_style

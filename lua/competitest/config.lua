@@ -135,6 +135,9 @@ local default_config = {
 	template_file = false,
 	received_problems_directory = false, -- whether to use flexible or fixed directories for received problems, it can be false, string or function
 	received_contests_directory = false,
+	received_files_extension = "cpp",
+	received_problems_prompt_filename = true,
+	received_contests_prompt_extension = true,
 	open_received_problems = true,
 	open_received_contests = true,
 }
