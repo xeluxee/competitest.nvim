@@ -6,8 +6,10 @@ local M = {}
 ---Convert a string with CompetiTest receive modifiers into a formatted string
 ---@param str string: the string to evaluate
 ---@param task table: table with received task data
+---@param file_extension string
+---@param remove_illegal_characters boolean: whether to remove windows illegal characters from modifiers or not
 ---@return string | nil: the converted string, or nil on failure
-function M.eval_receive_modifiers(str, task)
+function M.eval_receive_modifiers(str, task, file_extension, remove_illegal_characters)
 	local judge, contest
 	local hyphen = string.find(task.group, " - ", 1, true)
 	if not hyphen then
@@ -21,6 +23,8 @@ function M.eval_receive_modifiers(str, task)
 	local receive_modifiers = {
 		[""] = "$", -- $(): replace it with a dollar
 		["HOME"] = luv.os_homedir(), -- home directory
+		["CWD"] = vim.fn.getcwd(), -- current working directory
+		["FEXT"] = file_extension,
 		["PROBLEM"] = task.name, -- problem name, name field
 		["GROUP"] = task.group, -- judge and contest name, group field
 		["JUDGE"] = judge, -- first part of group, before hyphen
@@ -28,7 +32,17 @@ function M.eval_receive_modifiers(str, task)
 		["URL"] = task.url, -- problem url, url field
 		["MEMLIM"] = tostring(task.memoryLimit), -- available memory, memoryLimit field
 		["TIMELIM"] = tostring(task.timeLimit), -- time limit, timeLimit field
+		["JAVA_MAIN_CLASS"] = task.languages.java.mainClass, -- it's almost always 'Main'
+		["JAVA_TASK_CLASS"] = task.languages.java.taskClass, -- classname-friendly version of problem name
 	}
+
+	if remove_illegal_characters and vim.fn.has("win32") == 1 then
+		for modifier, value in pairs(receive_modifiers) do
+			if modifier ~= "HOME" and modifier ~= "CWD" then
+				receive_modifiers[modifier] = string.gsub(value, '[<>:"/\\|?*]', "_")
+			end
+		end
+	end
 
 	return utils.format_string_modifiers(str, receive_modifiers)
 end
@@ -167,11 +181,10 @@ end
 
 ---Utility function to store received problem following configuration
 ---@param filepath string: source file absolute path
----@param directory string: source file directory
 ---@param confirm_overwriting boolean: whether to ask user to overwrite an already existing file or not
 ---@param tclist table: table containing received testcases
 ---@param cfg table: table containing CompetiTest configuration
-function M.store_problem_config(filepath, directory, confirm_overwriting, tclist, cfg)
+function M.store_problem_config(filepath, confirm_overwriting, tclist, cfg)
 	if confirm_overwriting and utils.does_file_exist(filepath) then
 		local choice = vim.fn.confirm('Do you want to overwrite "' .. filepath .. '"?', "&Yes\n&No")
 		if choice == 2 then
@@ -197,7 +210,7 @@ function M.store_problem_config(filepath, directory, confirm_overwriting, tclist
 	M.store_problem(
 		filepath,
 		template_file,
-		directory .. "/" .. cfg.testcases_directory .. "/",
+		vim.fn.fnamemodify(filepath, ":h") .. "/" .. cfg.testcases_directory .. "/",
 		tclist,
 		cfg.testcases_use_single_file,
 		cfg.testcases_single_file_format,
