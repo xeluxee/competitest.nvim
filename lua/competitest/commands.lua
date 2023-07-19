@@ -197,6 +197,21 @@ end
 function M.receive(mode)
 	local receive = require("competitest.receive")
 
+	---Get path for received problems or contests
+	---@param path string | function: see received_problems_path, received_contests_directory and received_contests_problems_path
+	---@param task table: table with received task data
+	---@param file_extension string
+	---@return string
+	local function eval_path(path, task, file_extension)
+		local init_dir
+		if type(path) == "string" then
+			init_dir = receive.eval_receive_modifiers(path, task, file_extension, true)
+		elseif type(path) == "function" then
+			init_dir = path(task, file_extension)
+		end
+		return init_dir or ""
+	end
+
 	if mode == "testcases" then
 		local bufnr = api.nvim_get_current_buf()
 		config.load_buffer_config(bufnr)
@@ -205,35 +220,48 @@ function M.receive(mode)
 			receive.store_testcases(bufnr, tasks[1].tests, bufcfg.testcases_use_single_file)
 		end)
 	elseif mode == "problem" then
-		receive.receive(config.current_setup.companion_port, true, "problem", function(tasks)
-			widgets.input("Choose problem directory", vim.fn.getcwd(), config.current_setup.floating_border, function(directory)
-				widgets.input("Choose file name", tasks[1].name .. ".cpp", config.current_setup.floating_border, function(filename)
-					local filepath = directory .. "/" .. filename
-					local cfg = config.load_local_config_and_extend(directory)
-
-					receive.store_problem_config(filepath, directory, true, tasks[1].tests, cfg)
-				end)
-			end)
+		local setup = config.current_setup
+		receive.receive(setup.companion_port, true, "problem", function(tasks)
+			widgets.input(
+				"Choose problem path",
+				eval_path(setup.received_problems_path, tasks[1], setup.received_files_extension),
+				setup.floating_border,
+				not setup.received_problems_prompt_path,
+				function(filepath)
+					receive.store_problem_config(filepath, true, tasks[1].tests, setup)
+					if setup.open_received_problems then
+						vim.cmd("edit " .. filepath)
+					end
+				end
+			)
 		end)
 	elseif mode == "contest" then
-		widgets.input("Choose contest directory", vim.fn.getcwd(), config.current_setup.floating_border, function(directory)
-			widgets.input("Choose file extension", "cpp", config.current_setup.floating_border, function(file_extension)
-				receive.receive(config.current_setup.companion_port, false, "contest", function(tasks)
+		local setup = config.current_setup
+		receive.receive(setup.companion_port, false, "contest", function(tasks)
+			widgets.input(
+				"Choose contest directory",
+				eval_path(setup.received_contests_directory, tasks[1], setup.received_files_extension),
+				setup.floating_border,
+				not setup.received_contests_prompt_directory,
+				function(directory)
 					local cfg = config.load_local_config_and_extend(directory)
-
-					for _, task in ipairs(tasks) do
-						if vim.fn.has("win32") == 1 then -- remove windows illegal characters from file name
-							task.name = string.gsub(task.name, '[<>:"/\\|?*]', "_")
+					widgets.input(
+						"Choose files extension",
+						cfg.received_files_extension,
+						cfg.floating_border,
+						not cfg.received_contests_prompt_extension,
+						function(file_extension)
+							for _, task in ipairs(tasks) do
+								local filepath = directory .. "/" .. eval_path(cfg.received_contests_problems_path, task, file_extension)
+								receive.store_problem_config(filepath, true, task.tests, cfg)
+								if cfg.open_received_contests then
+									vim.cmd("edit " .. filepath)
+								end
+							end
 						end
-
-						local filepath = directory .. "/" .. task.name
-						if file_extension ~= "" then
-							filepath = filepath .. "." .. file_extension
-						end
-						receive.store_problem_config(filepath, directory, true, task.tests, cfg)
-					end
-				end)
-			end)
+					)
+				end
+			)
 		end)
 	else
 		utils.notify("receive: unrecognized mode '" .. tostring(mode) .. "'.")

@@ -3,6 +3,50 @@ local testcases = require("competitest.testcases")
 local utils = require("competitest.utils")
 local M = {}
 
+---Convert a string with CompetiTest receive modifiers into a formatted string
+---@param str string: the string to evaluate
+---@param task table: table with received task data
+---@param file_extension string
+---@param remove_illegal_characters boolean: whether to remove windows illegal characters from modifiers or not
+---@return string | nil: the converted string, or nil on failure
+function M.eval_receive_modifiers(str, task, file_extension, remove_illegal_characters)
+	local judge, contest
+	local hyphen = string.find(task.group, " - ", 1, true)
+	if not hyphen then
+		judge = task.group
+		contest = "unknown_contest"
+	else
+		judge = string.sub(task.group, 1, hyphen - 1)
+		contest = string.sub(task.group, hyphen + 3)
+	end
+
+	local receive_modifiers = {
+		[""] = "$", -- $(): replace it with a dollar
+		["HOME"] = luv.os_homedir(), -- home directory
+		["CWD"] = vim.fn.getcwd(), -- current working directory
+		["FEXT"] = file_extension,
+		["PROBLEM"] = task.name, -- problem name, name field
+		["GROUP"] = task.group, -- judge and contest name, group field
+		["JUDGE"] = judge, -- first part of group, before hyphen
+		["CONTEST"] = contest, -- second part of group, after hyphen
+		["URL"] = task.url, -- problem url, url field
+		["MEMLIM"] = tostring(task.memoryLimit), -- available memory, memoryLimit field
+		["TIMELIM"] = tostring(task.timeLimit), -- time limit, timeLimit field
+		["JAVA_MAIN_CLASS"] = task.languages.java.mainClass, -- it's almost always 'Main'
+		["JAVA_TASK_CLASS"] = task.languages.java.taskClass, -- classname-friendly version of problem name
+	}
+
+	if remove_illegal_characters and vim.fn.has("win32") == 1 then
+		for modifier, value in pairs(receive_modifiers) do
+			if modifier ~= "HOME" and modifier ~= "CWD" then
+				receive_modifiers[modifier] = string.gsub(value, '[<>:"/\\|?*]', "_")
+			end
+		end
+	end
+
+	return utils.format_string_modifiers(str, receive_modifiers)
+end
+
 ---Wait for competitive companion to send tasks data
 ---@param port integer: competitive companion port to listen on
 ---@param single_task boolean: whether to parse a single task or all tasks
@@ -108,9 +152,9 @@ end
 ---@param tcdir string: directory where testcases files will be stored
 ---@param tclist table: table containing received testcases
 ---@param use_single_file boolean: whether to store testcases in a single file or not
----@param single_file_format string: string with CompetiTest modifiers to match single testcases file name
----@param input_file_format string: string with CompetiTest modifiers to match input files name
----@param output_file_format string: string with CompetiTest modifiers to match output files name
+---@param single_file_format string: string with CompetiTest file-format modifiers to match single testcases file name
+---@param input_file_format string: string with CompetiTest file-format modifiers to match input files name
+---@param output_file_format string: string with CompetiTest file-format modifiers to match output files name
 function M.store_problem(filepath, template_file, tcdir, tclist, use_single_file, single_file_format, input_file_format, output_file_format)
 	if template_file and utils.does_file_exist(template_file) then
 		utils.create_directory(vim.fn.fnamemodify(filepath, ":h"))
@@ -128,7 +172,7 @@ function M.store_problem(filepath, template_file, tcdir, tclist, use_single_file
 	end
 
 	if use_single_file then
-		local single_file_path = tcdir .. utils.eval_string(filepath, single_file_format, nil)
+		local single_file_path = tcdir .. utils.eval_string(filepath, single_file_format)
 		testcases.single_file.write(single_file_path, tctbl)
 	else
 		testcases.io_files.write_eval_format_string(tcdir, tctbl, filepath, input_file_format, output_file_format)
@@ -137,11 +181,10 @@ end
 
 ---Utility function to store received problem following configuration
 ---@param filepath string: source file absolute path
----@param directory string: source file directory
 ---@param confirm_overwriting boolean: whether to ask user to overwrite an already existing file or not
 ---@param tclist table: table containing received testcases
 ---@param cfg table: table containing CompetiTest configuration
-function M.store_problem_config(filepath, directory, confirm_overwriting, tclist, cfg)
+function M.store_problem_config(filepath, confirm_overwriting, tclist, cfg)
 	if confirm_overwriting and utils.does_file_exist(filepath) then
 		local choice = vim.fn.confirm('Do you want to overwrite "' .. filepath .. '"?', "&Yes\n&No")
 		if choice == 2 then
@@ -150,8 +193,8 @@ function M.store_problem_config(filepath, directory, confirm_overwriting, tclist
 	end
 
 	local template_file -- template file absolute path
-	if type(cfg.template_file) == "string" then -- string with CompetiTest modifiers
-		template_file = utils.eval_string(filepath, cfg.template_file, nil)
+	if type(cfg.template_file) == "string" then -- string with CompetiTest file-format modifiers
+		template_file = utils.eval_string(filepath, cfg.template_file)
 	elseif type(cfg.template_file) == "table" then -- table with paths to template files
 		local extension = vim.fn.fnamemodify(filepath, ":e")
 		template_file = cfg.template_file[extension]
@@ -167,7 +210,7 @@ function M.store_problem_config(filepath, directory, confirm_overwriting, tclist
 	M.store_problem(
 		filepath,
 		template_file,
-		directory .. "/" .. cfg.testcases_directory .. "/",
+		vim.fn.fnamemodify(filepath, ":h") .. "/" .. cfg.testcases_directory .. "/",
 		tclist,
 		cfg.testcases_use_single_file,
 		cfg.testcases_single_file_format,

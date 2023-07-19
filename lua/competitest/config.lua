@@ -133,6 +133,15 @@ local default_config = {
 	companion_port = 27121, -- competitive companion port
 	receive_print_message = true,
 	template_file = false,
+	received_files_extension = "cpp",
+	received_problems_path = "$(CWD)/$(PROBLEM).$(FEXT)", -- where to store received problems, string or function
+	received_problems_prompt_path = true,
+	received_contests_directory = "$(CWD)", -- root directory for received contests
+	received_contests_problems_path = "$(PROBLEM).$(FEXT)", -- problems relative path from contest root
+	received_contests_prompt_directory = true,
+	received_contests_prompt_extension = true,
+	open_received_problems = true,
+	open_received_contests = true,
 }
 
 ---Return an updated configuration table with given options

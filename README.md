@@ -20,7 +20,7 @@
 
 ## Features
 - Multiple languages supported: it works out of the box with C, C++, Rust, Java and Python, but other languages can be [configured](#customize-compile-and-run-commands)
-- Flexible. No fixed folder structure or strict file-naming rules. You can choose where to put the source code file, the testcases, where to execute your programs and much more
+- Flexible. No strict file-naming rules, optional fixed folder structure. You can choose where to put the source code file, the testcases, the received problems and contests, where to execute your programs and much more
 - Configurable (see [Configuration](#configuration)). You can even configure [every folder individually](#local-configuration)
 - Testcases can be stored in a single file or in multiple text files, see [usage notes](#usage-notes)
 - [Add](#add-or-edit-a-testcase) testcases with `:CompetiTestAdd`
@@ -47,9 +47,19 @@ Install with `packer.nvim`:
 use {
 	'xeluxee/competitest.nvim',
 	requires = 'MunifTanjim/nui.nvim',
-	config = function() require'competitest'.setup() end
+	config = function() require('competitest').setup() end
 }
 ```
+
+Install with `lazy.nvim`:
+``` lua
+{
+	'xeluxee/competitest.nvim',
+	dependencies = 'MunifTanjim/nui.nvim',
+	config = function() require('competitest').setup() end,
+}
+```
+
 If you are using another package manager note that this plugin depends on [`nui.nvim`](https://github.com/MunifTanjim/nui.nvim), hence it should be installed as a dependency.
 
 ## Usage
@@ -139,9 +149,32 @@ Thanks to its integration with [competitive-companion](https://github.com/jmerle
 - Download an entire contest with `:CompetiTestReceive contest` (make sure to be on the homepage of the contest, not of a single problem)
 
 After launching one of these commands click on the green plus button in your browser to start downloading.\
-For further customization see `companion_port` and `receive_print_message` in [configuration](#configuration).
-
+For further customization see receive options in [configuration](#configuration).\
 When downloading a problem or a contest, source code templates can be configured for different file types. See `template_file` option in [configuration](#configuration).
+
+#### Customize folder structure
+By default CompetiTest stores received problems and contests in current working directory. You can change this behavior through the options `received_problems_path`, `received_contests_directory` and `received_contests_problems_path`. See [receive modifiers](#receive-modifiers) for further details.\
+Here are some tips:
+- Fixed directory for received problems (not contests):
+	``` lua
+	received_problems_path = "$(HOME)/Competitive Programming/$(JUDGE)/$(CONTEST)/$(PROBLEM).$(FEXT)"
+	```
+- Fixed directory for received contests:
+	``` lua
+	received_contests_directory = "$(HOME)/Competitive Programming/$(JUDGE)/$(CONTEST)"
+	```
+- Put every problem of a contest in a different directory:
+	``` lua
+	received_contests_problems_path = "$(PROBLEM)/main.$(FEXT)"
+	```
+- Example of file naming for Java contests:
+	``` lua
+	received_contests_problems_path = "$(PROBLEM)/$(JAVA_MAIN_CLASS).$(FEXT)"
+	```
+- Simplified file names, it works with Java and any other language because the modifier `$(JAVA_TASK_CLASS)` is generated from problem name removing all non-alphabetic and non-numeric characters, including spaces and punctuation:
+	``` lua
+	received_contests_problems_path = "$(JAVA_TASK_CLASS).$(FEXT)"
+	```
 
 ## Configuration
 ### Full configuration
@@ -262,6 +295,15 @@ require('competitest').setup {
 	companion_port = 27121,
 	receive_print_message = true,
 	template_file = false,
+	received_files_extension = "cpp",
+	received_problems_path = "$(CWD)/$(PROBLEM).$(FEXT)",
+	received_problems_prompt_path = true,
+	received_contests_directory = "$(CWD)",
+	received_contests_problems_path = "$(PROBLEM).$(FEXT)",
+	received_contests_prompt_directory = true,
+	received_contests_prompt_extension = true,
+	open_received_problems = true,
+	open_received_contests = true,
 }
 ```
 
@@ -345,26 +387,50 @@ require('competitest').setup {
 - `testcases_directory`: where testcases files are located, relatively to current file's path
 - `testcases_use_single_file`: if true testcases will be stored in a single file instead of using multiple text files. If you want to change the way already existing testcases are stored see [conversion](#convert-testcases)
 - `testcases_auto_detect_storage`: if true testcases storage method will be detected automatically. When both text files and single file are available, testcases will be loaded according to the preference specified in `testcases_use_single_file`
-- `testcases_single_file_format`: string representing how single testcases files should be named (see [modifiers](#available-modifiers))
-- `testcases_input_file_format`: string representing how testcases input files should be named (see [modifiers](#available-modifiers))
-- `testcases_output_file_format`: string representing how testcases output files should be named (see [modifiers](#available-modifiers))
+- `testcases_single_file_format`: string representing how single testcases files should be named (see [file-format modifiers](#file-format-modifiers))
+- `testcases_input_file_format`: string representing how testcases input files should be named (see [file-format modifiers](#file-format-modifiers))
+- `testcases_output_file_format`: string representing how testcases output files should be named (see [file-format modifiers](#file-format-modifiers))
 - `companion_port`: competitive companion port number
 - `receive_print_message`: if true notify user that plugin is ready to receive testcases, problems and contests or that they have just been received
 - `template_file`: templates to use when creating source files for received problems or contests. Can be one of the following:
 	- `false`: do not use templates
-	- string with [CompetiTest modifiers](#available-modifiers): useful when templates for different file types have a regular file naming
-	``` lua
-	template_file = "~/path/to/template.$(FEXT)"
-	```
+	- string with [file-format modifiers](#file-format-modifiers): useful when templates for different file types have a regular file naming
+		``` lua
+		template_file = "~/path/to/template.$(FEXT)"
+		```
 	- table with paths: table associating file extension to template file
-	``` lua
-	template_file = {
-	  c = "~/path/to/file.c",
-	  cpp = "~/path/to/file.cpp",
-	  py = "~/path/to/file.py",
-	}
-	```
-
+		``` lua
+		template_file = {
+			c = "~/path/to/file.c",
+			cpp = "~/path/to/file.cpp",
+			py = "~/path/to/file.py",
+		}
+		```
+- `received_files_extension`: default file extension for received problems
+- `received_problems_path`: path where received problems (not contests) are stored. Can be one of the following:
+	- string with [receive modifiers](#receive-modifiers)
+	- function: function accepting two arguments, a table with [task details](https://github.com/jmerle/competitive-companion/#the-format) and a string with preferred file extension. It should return the absolute path to store received problem. Example:
+		``` lua
+		received_problems_path = function(task, file_extension)
+			local hyphen = string.find(task.group, " - ")
+			local judge, contest
+			if not hyphen then
+				judge = task.group
+				contest = "unknown_contest"
+			else
+				judge = string.sub(task.group, 1, hyphen - 1)
+				contest = string.sub(task.group, hyphen + 3)
+			end
+			return string.format("%s/Competitive Programming/%s/%s/%s.%s", vim.loop.os_homedir(), judge, contest, task.name, file_extension)
+		end
+		```
+- `received_problems_prompt_path`: whether to ask user confirmation about path where the received problem is stored or not
+- `received_contests_directory`: directory where received contests are stored. It can be string or function, exactly as `received_problems_path`
+- `received_contests_problems_path`: relative path from contest root directory, each problem of a received contest is stored following this option. It can be string or function, exactly as `received_problems_path`
+- `received_contests_prompt_directory`: whether to ask user confirmation about the directory where received contests are stored or not
+- `received_contests_prompt_extension`: whether to ask user confirmation about what file extension to when receiving a contests or not
+- `open_received_problems`: automatically open source files when receiving a single problem
+- `open_received_contests`: automatically open source files when receiving a contest
 
 ### Local configuration
 You can use a different configuration for every different folder by creating a file called `.competitest.lua` (this name can be changed configuring the option `local_config_file_name`). It will affect every file contained in that folder and in subfolders. A table containing valid options must be returned, see the following example.
@@ -380,18 +446,42 @@ return {
 ```
 
 ### Available modifiers
-Modifiers are strings that will be replaced by something else. You can use them to [define commands](#customize-compile-and-run-commands) or to customize testcases files naming through options `testcases_single_file_format`, `testcases_input_file_format` and `testcases_output_file_format`.
+Modifiers are substrings that will be replaced by another string, depending on the modifier and the context. They're used to tweak some options.
 
-| Modifier      | Meaning |
-| --------      | ------- |
-| `$()`         | insert a dollar |
-| `$(HOME)`     | user home directory |
-| `$(FNAME)`    | file name |
-| `$(FNOEXT)`   | file name without extension |
-| `$(FEXT)`     | file extension |
-| `$(FABSPATH)` | absolute path of current file |
+#### File-format modifiers
+You can use them to [define commands](#customize-compile-and-run-commands) or to customize testcases files naming through options `testcases_single_file_format`, `testcases_input_file_format` and `testcases_output_file_format`.
+
+| Modifier      | Meaning                                    |
+| --------      | -------                                    |
+| `$()`         | insert a dollar                            |
+| `$(HOME)`     | user home directory                        |
+| `$(FNAME)`    | file name                                  |
+| `$(FNOEXT)`   | file name without extension                |
+| `$(FEXT)`     | file extension                             |
+| `$(FABSPATH)` | absolute path of current file              |
 | `$(ABSDIR)`   | absolute path of folder that contains file |
-| `$(TCNUM)`    | testcase number |
+| `$(TCNUM)`    | testcase number                            |
+
+#### Receive modifiers
+You can use them to customize the options `received_problems_path`, `received_contests_directory` and `received_contests_problems_path`. See also [tips for customizing folder structure for received problems and contests](#customize-folder-structure).
+
+| Modifier             | Meaning                                                       |
+| --------             | -------                                                       |
+| `$()`                | insert a dollar                                               |
+| `$(HOME)`            | user home directory                                           |
+| `$(CWD)`             | current working directory                                     |
+| `$(FEXT)`            | preferred file extension                                      |
+| `$(PROBLEM)`         | problem name, `name` field                                    |
+| `$(GROUP)`           | judge and contest name, `group` field                         |
+| `$(JUDGE)`           | judge name (first part of `group`, before hyphen)             |
+| `$(CONTEST)`         | contest name (second part of `group`, after hyphen)           |
+| `$(URL)`             | problem url, `url` field                                      |
+| `$(MEMLIM)`          | available memory, `memoryLimit` field                         |
+| `$(TIMELIM)`         | time limit, `timeLimit` field                                 |
+| `$(JAVA_MAIN_CLASS)` | almost always "Main", `mainClass` field                       |
+| `$(JAVA_TASK_CLASS)` | classname-friendly version of problem name, `taskClass` field |
+
+Fields are referred to [received tasks](https://github.com/jmerle/competitive-companion/#the-format).
 
 ### Customize compile and run commands
 Languages as C, C++, Rust, Java and Python are supported by default.\
@@ -408,7 +498,7 @@ require('competitest').setup {
 	},
 }
 ```
-See [available modifiers](#available-modifiers) to understand better how dollar notation works.
+See [file-format modifiers](#file-format-modifiers) to better understand how dollar notation works.
 
 **NOTE:** if your language isn't compiled you can ignore `compile_command` section.
 
@@ -507,6 +597,7 @@ hi CompetiTestWrong   ctermfg=red    guifg=#ff0000
 	- [x] Download testcases
 	- [x] Download problems
 	- [x] Download contests
+	- [x] Customizable folder structure for downloaded problems and contests
 - [x] Templates for files created when receiving problems or contests
 - [ ] Integration with tools to submit solutions ([api-client](https://github.com/online-judge-tools/api-client) or [cpbooster](https://github.com/searleser97/cpbooster))
 - [ ] Write Vim docs
