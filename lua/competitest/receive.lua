@@ -8,8 +8,9 @@ local M = {}
 ---@param task table: table with received task data
 ---@param file_extension string
 ---@param remove_illegal_characters boolean: whether to remove windows illegal characters from modifiers or not
+---@param date_format string: string used to format date
 ---@return string | nil: the converted string, or nil on failure
-function M.eval_receive_modifiers(str, task, file_extension, remove_illegal_characters)
+function M.eval_receive_modifiers(str, task, file_extension, remove_illegal_characters, date_format)
 	local judge, contest
 	local hyphen = string.find(task.group, " - ", 1, true)
 	if not hyphen then
@@ -34,6 +35,7 @@ function M.eval_receive_modifiers(str, task, file_extension, remove_illegal_char
 		["TIMELIM"] = tostring(task.timeLimit), -- time limit, timeLimit field
 		["JAVA_MAIN_CLASS"] = task.languages.java.mainClass, -- it's almost always 'Main'
 		["JAVA_TASK_CLASS"] = task.languages.java.taskClass, -- classname-friendly version of problem name
+		["DATE"] = tostring(os.date(date_format)),
 	}
 
 	if remove_illegal_characters and vim.fn.has("win32") == 1 then
@@ -156,6 +158,7 @@ end
 ---@param single_file_format string: string with CompetiTest file-format modifiers to match single testcases file name
 ---@param input_file_format string: string with CompetiTest file-format modifiers to match input files name
 ---@param output_file_format string: string with CompetiTest file-format modifiers to match output files name
+---@param date_format string: string used to format date
 function M.store_problem(
 	filepath,
 	template_file,
@@ -165,14 +168,15 @@ function M.store_problem(
 	use_single_file,
 	single_file_format,
 	input_file_format,
-	output_file_format
+	output_file_format,
+	date_format
 )
 	if template_file and utils.does_file_exist(template_file) then
 		utils.create_directory(vim.fn.fnamemodify(filepath, ":h"))
 		if evaluate_template then
 			local str = utils.load_file_as_string(template_file)
 			local extension = vim.fn.fnamemodify(template_file, ":e")
-			local evaluated_str = M.eval_receive_modifiers(str, task, extension, false)
+			local evaluated_str = M.eval_receive_modifiers(str, task, extension, false, date_format)
 			utils.write_string_on_file(filepath, evaluated_str)
 		else
 			luv.fs_copyfile(template_file, filepath)
@@ -234,7 +238,8 @@ function M.store_problem_config(filepath, confirm_overwriting, task, cfg)
 		cfg.testcases_use_single_file,
 		cfg.testcases_single_file_format,
 		cfg.testcases_input_file_format,
-		cfg.testcases_output_file_format
+		cfg.testcases_output_file_format,
+		cfg.date_format
 	)
 end
 

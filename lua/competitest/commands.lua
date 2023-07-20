@@ -201,11 +201,12 @@ function M.receive(mode)
 	---@param path string | function: see received_problems_path, received_contests_directory and received_contests_problems_path
 	---@param task table: table with received task data
 	---@param file_extension string
+	---@param date_format string: string used to format date
 	---@return string
-	local function eval_path(path, task, file_extension)
+	local function eval_path(path, task, file_extension, date_format)
 		local init_dir
 		if type(path) == "string" then
-			init_dir = receive.eval_receive_modifiers(path, task, file_extension, true)
+			init_dir = receive.eval_receive_modifiers(path, task, file_extension, true, date_format)
 		elseif type(path) == "function" then
 			init_dir = path(task, file_extension)
 		end
@@ -224,7 +225,7 @@ function M.receive(mode)
 		receive.receive(setup.companion_port, true, "problem", function(tasks)
 			widgets.input(
 				"Choose problem path",
-				eval_path(setup.received_problems_path, tasks[1], setup.received_files_extension),
+				eval_path(setup.received_problems_path, tasks[1], setup.received_files_extension, setup.date_format),
 				setup.floating_border,
 				not setup.received_problems_prompt_path,
 				function(filepath)
@@ -240,7 +241,7 @@ function M.receive(mode)
 		receive.receive(setup.companion_port, false, "contest", function(tasks)
 			widgets.input(
 				"Choose contest directory",
-				eval_path(setup.received_contests_directory, tasks[1], setup.received_files_extension),
+				eval_path(setup.received_contests_directory, tasks[1], setup.received_files_extension, setup.date_format),
 				setup.floating_border,
 				not setup.received_contests_prompt_directory,
 				function(directory)
@@ -252,7 +253,7 @@ function M.receive(mode)
 						not cfg.received_contests_prompt_extension,
 						function(file_extension)
 							for _, task in ipairs(tasks) do
-								local filepath = directory .. "/" .. eval_path(cfg.received_contests_problems_path, task, file_extension)
+								local filepath = directory .. "/" .. eval_path(cfg.received_contests_problems_path, task, file_extension, cfg.date_format)
 								receive.store_problem_config(filepath, true, task, cfg)
 								if cfg.open_received_contests then
 									vim.cmd("edit " .. filepath)
