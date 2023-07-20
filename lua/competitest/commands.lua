@@ -228,7 +228,7 @@ function M.receive(mode)
 				setup.floating_border,
 				not setup.received_problems_prompt_path,
 				function(filepath)
-					receive.store_problem_config(filepath, true, tasks[1].tests, setup)
+					receive.store_problem_config(filepath, true, tasks[1], setup)
 					if setup.open_received_problems then
 						vim.cmd("edit " .. filepath)
 					end
@@ -253,7 +253,7 @@ function M.receive(mode)
 						function(file_extension)
 							for _, task in ipairs(tasks) do
 								local filepath = directory .. "/" .. eval_path(cfg.received_contests_problems_path, task, file_extension)
-								receive.store_problem_config(filepath, true, task.tests, cfg)
+								receive.store_problem_config(filepath, true, task, cfg)
 								if cfg.open_received_contests then
 									vim.cmd("edit " .. filepath)
 								end

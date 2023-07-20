@@ -149,16 +149,34 @@ end
 ---Utility function to store received problem (source file and testcases)
 ---@param filepath string: source file absolute path
 ---@param template_file string | nil: template file absolute path, or nil to create empty source file
+---@param evaluate_template boolean: whether to evaluate the template for receive modifiers
+---@param task table: table with all task details
 ---@param tcdir string: directory where testcases files will be stored
----@param tclist table: table containing received testcases
 ---@param use_single_file boolean: whether to store testcases in a single file or not
 ---@param single_file_format string: string with CompetiTest file-format modifiers to match single testcases file name
 ---@param input_file_format string: string with CompetiTest file-format modifiers to match input files name
 ---@param output_file_format string: string with CompetiTest file-format modifiers to match output files name
-function M.store_problem(filepath, template_file, tcdir, tclist, use_single_file, single_file_format, input_file_format, output_file_format)
+function M.store_problem(
+	filepath,
+	template_file,
+	evaluate_template,
+	task,
+	tcdir,
+	use_single_file,
+	single_file_format,
+	input_file_format,
+	output_file_format
+)
 	if template_file and utils.does_file_exist(template_file) then
 		utils.create_directory(vim.fn.fnamemodify(filepath, ":h"))
-		luv.fs_copyfile(template_file, filepath)
+		if evaluate_template then
+			local str = utils.load_file_as_string(template_file)
+			local extension = vim.fn.fnamemodify(template_file, ":e")
+			local evaluated_str = M.eval_receive_modifiers(str, task, extension, false)
+			utils.write_string_on_file(filepath, evaluated_str)
+		else
+			luv.fs_copyfile(template_file, filepath)
+		end
 	else
 		utils.write_string_on_file(filepath, "")
 	end
@@ -166,7 +184,7 @@ function M.store_problem(filepath, template_file, tcdir, tclist, use_single_file
 	local tctbl = {}
 	local tcindex = 0
 	-- convert tclist into a 0-indexed testcases table
-	for _, tc in ipairs(tclist) do
+	for _, tc in ipairs(task.tests) do
 		tctbl[tcindex] = tc
 		tcindex = tcindex + 1
 	end
@@ -182,9 +200,9 @@ end
 ---Utility function to store received problem following configuration
 ---@param filepath string: source file absolute path
 ---@param confirm_overwriting boolean: whether to ask user to overwrite an already existing file or not
----@param tclist table: table containing received testcases
+---@param task table: table with all task details
 ---@param cfg table: table containing CompetiTest configuration
-function M.store_problem_config(filepath, confirm_overwriting, tclist, cfg)
+function M.store_problem_config(filepath, confirm_overwriting, task, cfg)
 	if confirm_overwriting and utils.does_file_exist(filepath) then
 		local choice = vim.fn.confirm('Do you want to overwrite "' .. filepath .. '"?', "&Yes\n&No")
 		if choice == 2 then
@@ -210,8 +228,9 @@ function M.store_problem_config(filepath, confirm_overwriting, tclist, cfg)
 	M.store_problem(
 		filepath,
 		template_file,
+		cfg.evaluate_template_modifiers,
+		task,
 		vim.fn.fnamemodify(filepath, ":h") .. "/" .. cfg.testcases_directory .. "/",
-		tclist,
 		cfg.testcases_use_single_file,
 		cfg.testcases_single_file_format,
 		cfg.testcases_input_file_format,
