@@ -134,6 +134,7 @@ local default_config = {
 	receive_print_message = true,
 	template_file = false,
 	evaluate_template_modifiers = false,
+	date_format = "%c",
 	received_files_extension = "cpp",
 	received_problems_path = "$(CWD)/$(PROBLEM).$(FEXT)", -- where to store received problems, string or function
 	received_problems_prompt_path = true,
@@ -143,7 +144,6 @@ local default_config = {
 	received_contests_prompt_extension = true,
 	open_received_problems = true,
 	open_received_contests = true,
-	date_format = "%c",
 }
 
 ---Return an updated configuration table with given options
