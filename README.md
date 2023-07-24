@@ -28,6 +28,7 @@
 - [Delete](#remove-a-testcase) a testcase with `:CompetiTestDelete`
 - [Run](#run-testcases) your program across all the testcases with `:CompetiTestRun`, showing results and execution data in a nice interactive UI
 - [Download](#receive-testcases-problems-and-contests) testcases, problems and contests automatically from competitive programming platforms with `:CompetiTestReceive`
+- [Templates](#templates-for-received-problems-and-contests) for received problems and contests
 - View diff between actual and expected output
 - [Customizable interface](#customize-ui-layout) that resizes automatically when Neovim window is resized
 - Integration with [statusline and winbar](#statusline-and-winbar-integration)
@@ -149,8 +150,7 @@ Thanks to its integration with [competitive-companion](https://github.com/jmerle
 - Download an entire contest with `:CompetiTestReceive contest` (make sure to be on the homepage of the contest, not of a single problem)
 
 After launching one of these commands click on the green plus button in your browser to start downloading.\
-For further customization see receive options in [configuration](#configuration).\
-When downloading a problem or a contest, source code templates can be configured for different file types. See `template_file` option in [configuration](#configuration).
+For further customization see receive options in [configuration](#configuration).
 
 #### Customize folder structure
 By default CompetiTest stores received problems and contests in current working directory. You can change this behavior through the options `received_problems_path`, `received_contests_directory` and `received_contests_problems_path`. See [receive modifiers](#receive-modifiers) for further details.\
@@ -175,6 +175,27 @@ Here are some tips:
 	``` lua
 	received_contests_problems_path = "$(JAVA_TASK_CLASS).$(FEXT)"
 	```
+
+#### Templates for received problems and contests
+When downloading a problem or a contest, source code templates can be configured for different file types. See `template_file` option in [configuration](#configuration).\
+[Receive modifiers](#receive-modifiers) can be used inside template files to insert details about received problems. To enable this feature set `evaluate_template_modifiers` to `true`. Template example for C++:
+``` cpp
+// Problem: $(PROBLEM)
+// Contest: $(CONTEST)
+// Judge: $(JUDGE)
+// URL: $(URL)
+// Memory Limit: $(MEMLIM)
+// Time Limit: $(TIMELIM)
+// Start: $(DATE)
+
+#include <iostream>
+using namespace std;
+int main() {
+	cout << "This is a template file" << endl;
+	cerr << "Problem name is $(PROBLEM)" << endl;
+	return 0;
+}
+```
 
 ## Configuration
 ### Full configuration
@@ -296,6 +317,7 @@ require('competitest').setup {
 	receive_print_message = true,
 	template_file = false,
 	evaluate_template_modifiers = false,
+	date_format = "%c",
 	received_files_extension = "cpp",
 	received_problems_path = "$(CWD)/$(PROBLEM).$(FEXT)",
 	received_problems_prompt_path = true,
@@ -305,7 +327,6 @@ require('competitest').setup {
 	received_contests_prompt_extension = true,
 	open_received_problems = true,
 	open_received_contests = true,
-	date_format = "%c",
 }
 ```
 
@@ -408,7 +429,8 @@ require('competitest').setup {
 			py = "~/path/to/file.py",
 		}
 		```
-- `evaluate_template_modifier`: whether to evaluate the template file for receive modifiers
+- `evaluate_template_modifiers`: whether to evaluate [receive modifiers](#receive-modifiers) inside a template file or not
+- `date_format`: string used to format `$(DATE)` modifier (see [receive modifiers](#receive-modifiers)). The string should follow the formatting rules as per Lua's [`os.date`](https://www.lua.org/pil/22.1.html) function. For example, to get `06-07-2023 15:24:32` set it to `%d-%m-%Y %H:%M:%S`
 - `received_files_extension`: default file extension for received problems
 - `received_problems_path`: path where received problems (not contests) are stored. Can be one of the following:
 	- string with [receive modifiers](#receive-modifiers)
@@ -434,10 +456,6 @@ require('competitest').setup {
 - `received_contests_prompt_extension`: whether to ask user confirmation about what file extension to when receiving a contests or not
 - `open_received_problems`: automatically open source files when receiving a single problem
 - `open_received_contests`: automatically open source files when receiving a contest
-- `date_format`: string which is used to format the time in the `$(DATE)` modifier. The string should follow the formatting rules as per Lua's [`os.date`](https://www.lua.org/pil/22.1.html) function. For example, to get `06-07-2023 15:24:32`: 
-	```lua
-	time_format = "%d-%m-%Y %H:%M:%S"
-	```
 
 ### Local configuration
 You can use a different configuration for every different folder by creating a file called `.competitest.lua` (this name can be changed configuring the option `local_config_file_name`). It will affect every file contained in that folder and in subfolders. A table containing valid options must be returned, see the following example.
@@ -470,24 +488,24 @@ You can use them to [define commands](#customize-compile-and-run-commands) or to
 | `$(TCNUM)`    | testcase number                            |
 
 #### Receive modifiers
-You can use them to customize the options `received_problems_path`, `received_contests_directory` and `received_contests_problems_path`. See also [tips for customizing folder structure for received problems and contests](#customize-folder-structure).
+You can use them to customize the options `received_problems_path`, `received_contests_directory`, `received_contests_problems_path` and to [insert problem details inside template files](#templates-for-received-problems-and-contests). See also [tips for customizing folder structure for received problems and contests](#customize-folder-structure).
 
-| Modifier             | Meaning                                                        |
-| --------             | -------                                                        |
-| `$()`                | insert a dollar                                                |
-| `$(HOME)`            | user home directory                                            |
-| `$(CWD)`             | current working directory                                      |
-| `$(FEXT)`            | preferred file extension                                       |
-| `$(PROBLEM)`         | problem name, `name` field                                     |
-| `$(GROUP)`           | judge and contest name, `group` field                          |
-| `$(JUDGE)`           | judge name (first part of `group`, before hyphen)              |
-| `$(CONTEST)`         | contest name (second part of `group`, after hyphen)            |
-| `$(URL)`             | problem url, `url` field                                       |
-| `$(MEMLIM)`          | available memory, `memoryLimit` field                          |
-| `$(TIMELIM)`         | time limit, `timeLimit` field                                  |
-| `$(JAVA_MAIN_CLASS)` | almost always "Main", `mainClass` field                        |
-| `$(JAVA_TASK_CLASS)` | classname-friendly version of problem name, `taskClass` field  |
-| `$(DATE)`            | current date and time (based on [`date_format`](#explanation)) |
+| Modifier             | Meaning                                                       |
+| --------             | -------                                                       |
+| `$()`                | insert a dollar                                               |
+| `$(HOME)`            | user home directory                                           |
+| `$(CWD)`             | current working directory                                     |
+| `$(FEXT)`            | preferred file extension                                      |
+| `$(PROBLEM)`         | problem name, `name` field                                    |
+| `$(GROUP)`           | judge and contest name, `group` field                         |
+| `$(JUDGE)`           | judge name (first part of `group`, before hyphen)             |
+| `$(CONTEST)`         | contest name (second part of `group`, after hyphen)           |
+| `$(URL)`             | problem url, `url` field                                      |
+| `$(MEMLIM)`          | available memory, `memoryLimit` field                         |
+| `$(TIMELIM)`         | time limit, `timeLimit` field                                 |
+| `$(JAVA_MAIN_CLASS)` | almost always "Main", `mainClass` field                       |
+| `$(JAVA_TASK_CLASS)` | classname-friendly version of problem name, `taskClass` field |
+| `$(DATE)`            | current date and time (based on [`date_format`](#explanation)), it can be used only inside [template files](#templates-for-received-problems-and-contests) |
 
 Fields are referred to [received tasks](https://github.com/jmerle/competitive-companion/#the-format).
 
