@@ -8,8 +8,9 @@ local M = {}
 ---@param task table: table with received task data
 ---@param file_extension string
 ---@param remove_illegal_characters boolean: whether to remove windows illegal characters from modifiers or not
+---@param date_format string | nil: string used to format date
 ---@return string | nil: the converted string, or nil on failure
-function M.eval_receive_modifiers(str, task, file_extension, remove_illegal_characters)
+function M.eval_receive_modifiers(str, task, file_extension, remove_illegal_characters, date_format)
 	local judge, contest
 	local hyphen = string.find(task.group, " - ", 1, true)
 	if not hyphen then
@@ -34,6 +35,7 @@ function M.eval_receive_modifiers(str, task, file_extension, remove_illegal_char
 		["TIMELIM"] = tostring(task.timeLimit), -- time limit, timeLimit field
 		["JAVA_MAIN_CLASS"] = task.languages.java.mainClass, -- it's almost always 'Main'
 		["JAVA_TASK_CLASS"] = task.languages.java.taskClass, -- classname-friendly version of problem name
+		["DATE"] = tostring(os.date(date_format)),
 	}
 
 	if remove_illegal_characters and vim.fn.has("win32") == 1 then
@@ -146,45 +148,12 @@ function M.store_testcases(bufnr, tclist, use_single_file)
 	testcases.buf_write_testcases(bufnr, tctbl, use_single_file)
 end
 
----Utility function to store received problem (source file and testcases)
----@param filepath string: source file absolute path
----@param template_file string | nil: template file absolute path, or nil to create empty source file
----@param tcdir string: directory where testcases files will be stored
----@param tclist table: table containing received testcases
----@param use_single_file boolean: whether to store testcases in a single file or not
----@param single_file_format string: string with CompetiTest file-format modifiers to match single testcases file name
----@param input_file_format string: string with CompetiTest file-format modifiers to match input files name
----@param output_file_format string: string with CompetiTest file-format modifiers to match output files name
-function M.store_problem(filepath, template_file, tcdir, tclist, use_single_file, single_file_format, input_file_format, output_file_format)
-	if template_file and utils.does_file_exist(template_file) then
-		utils.create_directory(vim.fn.fnamemodify(filepath, ":h"))
-		luv.fs_copyfile(template_file, filepath)
-	else
-		utils.write_string_on_file(filepath, "")
-	end
-
-	local tctbl = {}
-	local tcindex = 0
-	-- convert tclist into a 0-indexed testcases table
-	for _, tc in ipairs(tclist) do
-		tctbl[tcindex] = tc
-		tcindex = tcindex + 1
-	end
-
-	if use_single_file then
-		local single_file_path = tcdir .. utils.eval_string(filepath, single_file_format)
-		testcases.single_file.write(single_file_path, tctbl)
-	else
-		testcases.io_files.write_eval_format_string(tcdir, tctbl, filepath, input_file_format, output_file_format)
-	end
-end
-
 ---Utility function to store received problem following configuration
 ---@param filepath string: source file absolute path
 ---@param confirm_overwriting boolean: whether to ask user to overwrite an already existing file or not
----@param tclist table: table containing received testcases
+---@param task table: table with all task details
 ---@param cfg table: table containing CompetiTest configuration
-function M.store_problem_config(filepath, confirm_overwriting, tclist, cfg)
+function M.store_problem_config(filepath, confirm_overwriting, task, cfg)
 	if confirm_overwriting and utils.does_file_exist(filepath) then
 		local choice = vim.fn.confirm('Do you want to overwrite "' .. filepath .. '"?', "&Yes\n&No")
 		if choice == 2 then
@@ -192,31 +161,54 @@ function M.store_problem_config(filepath, confirm_overwriting, tclist, cfg)
 		end -- user chose "No"
 	end
 
+	local file_extension = vim.fn.fnamemodify(filepath, ":e")
 	local template_file -- template file absolute path
 	if type(cfg.template_file) == "string" then -- string with CompetiTest file-format modifiers
 		template_file = utils.eval_string(filepath, cfg.template_file)
 	elseif type(cfg.template_file) == "table" then -- table with paths to template files
-		local extension = vim.fn.fnamemodify(filepath, ":e")
-		template_file = cfg.template_file[extension]
+		template_file = cfg.template_file[file_extension]
 	end
 
 	if template_file then
 		template_file = string.gsub(template_file, "^%~", vim.loop.os_homedir()) -- expand tilde into home directory
-		if type(cfg.template_file) == "table" and not utils.does_file_exist(template_file) then -- check if file exists when path is explicitly set
-			utils.notify('template file "' .. template_file .. "\" doesn't exist.", "WARN")
+		if not utils.does_file_exist(template_file) then
+			if type(cfg.template_file) == "table" then -- notify file absence when path is explicitly set
+				utils.notify('template file "' .. template_file .. "\" doesn't exist.", "WARN")
+			end
+			template_file = nil
 		end
 	end
 
-	M.store_problem(
-		filepath,
-		template_file,
-		vim.fn.fnamemodify(filepath, ":h") .. "/" .. cfg.testcases_directory .. "/",
-		tclist,
-		cfg.testcases_use_single_file,
-		cfg.testcases_single_file_format,
-		cfg.testcases_input_file_format,
-		cfg.testcases_output_file_format
-	)
+	local file_directory = vim.fn.fnamemodify(filepath, ":h")
+	-- if template file exists then template_file is a string
+	if template_file then
+		if cfg.evaluate_template_modifiers then
+			local str = utils.load_file_as_string(template_file)
+			local evaluated_str = M.eval_receive_modifiers(str, task, file_extension, false, cfg.date_format)
+			utils.write_string_on_file(filepath, evaluated_str or "")
+		else
+			utils.create_directory(file_directory)
+			luv.fs_copyfile(template_file, filepath)
+		end
+	else
+		utils.write_string_on_file(filepath, "")
+	end
+
+	local tctbl = {}
+	local tcindex = 0
+	-- convert testcases list into a 0-indexed testcases table
+	for _, tc in ipairs(task.tests) do
+		tctbl[tcindex] = tc
+		tcindex = tcindex + 1
+	end
+
+	local tcdir = file_directory .. "/" .. cfg.testcases_directory .. "/"
+	if cfg.testcases_use_single_file then
+		local single_file_path = tcdir .. utils.eval_string(filepath, cfg.testcases_single_file_format)
+		testcases.single_file.write(single_file_path, tctbl)
+	else
+		testcases.io_files.write_eval_format_string(tcdir, tctbl, filepath, cfg.testcases_input_file_format, cfg.testcases_output_file_format)
+	end
 end
 
 return M
