@@ -2,7 +2,7 @@ local config = require("competitest.config")
 local M = {}
 
 ---Setup CompetiTest
----@param opts table: a table containing user configuration
+---@param opts table | nil: a table containing user configuration
 function M.setup(opts)
 	config.current_setup = config.update_config_table(config.current_setup, opts)
 
@@ -11,21 +11,44 @@ function M.setup(opts)
 
 		-- CompetiTest commands
 		vim.cmd([[
-		function! s:convert_command_completion(...) abort
-			return "auto\nfiles_to_singlefile\nsinglefile_to_files"
-		endfunction
-		function! s:receive_command_completion(...) abort
-			return "testcases\nproblem\ncontest"
-		endfunction
+		function! s:command_completion(_, CmdLine, CursorPos) abort
+			let prefix = a:CmdLine[:a:CursorPos]
+			let ending_space = prefix[-1:-1] == " "
+			let words = split(prefix)
+			let wlen = len(words)
 
-		command! -bar CompetiTestAdd lua require("competitest.commands").edit_testcase(true)
-		command! -bar -nargs=? CompetiTestEdit lua require("competitest.commands").edit_testcase(false, <q-args>)
-		command! -bar -nargs=? CompetiTestDelete lua require("competitest.commands").delete_testcase(<q-args>)
-		command! -bar -nargs=1 -complete=custom,s:convert_command_completion CompetiTestConvert lua require("competitest.commands").convert_testcases(<q-args>)
-		command! -bar -nargs=* CompetiTestRun lua require("competitest.commands").run_testcases(<q-args>, true)
-		command! -bar -nargs=* CompetiTestRunNC lua require("competitest.commands").run_testcases(<q-args>, false)
-		command! -bar CompetiTestRunNE lua require("competitest.commands").run_testcases(<q-args>, false, true)
-		command! -bar -nargs=1 -complete=custom,s:receive_command_completion CompetiTestReceive lua require("competitest.commands").receive(<q-args>)
+			if wlen == 1 || wlen == 2 && !ending_space
+				return "add_testcase\nedit_testcase\ndelete_testcase\nconvert\nrun\nrun_no_compile\nshow_ui\nreceive"
+			elseif wlen == 2 || wlen == 3 && !ending_space
+				if wlen == 2
+					let lastword = words[-1]
+				else
+					let lastword = words[-2]
+				endif
+
+				if lastword == "convert"
+					return "auto\nfiles_to_singlefile\nsinglefile_to_files"
+				elseif lastword == "receive"
+					return "testcases\nproblem\ncontest"
+				endif
+			endif
+			return ""
+		endfunction
+		command! -bar -nargs=* -complete=custom,s:command_completion CompetiTest lua require("competitest.commands").command(<q-args>)
+
+		let s:old_commands = [
+			\ ["Add", "add_testcase"],
+			\ ["Edit", "edit_testcase"],
+			\ ["Delete", "delete_testcase"],
+			\ ["Convert", "convert"],
+			\ ["Run", "run"],
+			\ ["RunNC", "run_no_compile"],
+			\ ["RunNE", "show_ui"],
+			\ ["Receive", "receive"],
+			\ ]
+		for cmd in s:old_commands
+			execute printf("command! -bar -nargs=* CompetiTest%s lua require('competitest.commands').deprecated_commands('%s', '%s', <q-args>)", cmd[0], cmd[0], cmd[1])
+		endfor
 		]])
 
 		-- create highlight groups

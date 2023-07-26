@@ -23,11 +23,9 @@
 - Flexible. No strict file-naming rules, optional fixed folder structure. You can choose where to put the source code file, the testcases, the received problems and contests, where to execute your programs and much more
 - Configurable (see [Configuration](#configuration)). You can even configure [every folder individually](#local-configuration)
 - Testcases can be stored in a single file or in multiple text files, see [usage notes](#usage-notes)
-- [Add](#add-or-edit-a-testcase) testcases with `:CompetiTestAdd`
-- [Edit](#add-or-edit-a-testcase) a testcases with `:CompetiTestEdit`
-- [Delete](#remove-a-testcase) a testcase with `:CompetiTestDelete`
-- [Run](#run-testcases) your program across all the testcases with `:CompetiTestRun`, showing results and execution data in a nice interactive UI
-- [Download](#receive-testcases-problems-and-contests) testcases, problems and contests automatically from competitive programming platforms with `:CompetiTestReceive`
+- Easily [add](#add-or-edit-a-testcase), [edit](#add-or-edit-a-testcase) and [delete](#remove-a-testcase) testcases
+- [Run](#run-testcases) your program across all the testcases, showing results and execution data in a nice interactive UI
+- [Download](#receive-testcases-problems-and-contests) testcases, problems and contests automatically from competitive programming platforms
 - [Templates](#templates-for-received-problems-and-contests) for received problems and contests
 - View diff between actual and expected output
 - [Customizable interface](#customize-ui-layout) that resizes automatically when Neovim window is resized
@@ -96,24 +94,24 @@ To see all the available settings see [configuration](#configuration).
 - Of course single file naming can be configured: see `testcases_single_file_format` in [configuration](#configuration)
 - Testcases file can be put in the same folder of the source code file, but you can customize its path (see `testcases_directory` in [configuration](#configuration))
 
-Anyway you can forget about these rules if you use `:CompetiTestAdd` and `:CompetiTestEdit`, that handle these things for you.
+Anyway you can forget about these rules if you use `:CompetiTest add_testcase` and `:CompetiTest edit_testcase`, that handle these things for you.
 
 When launching the following commands make sure the focused buffer is the one containing the source code file.
 
 ### Add or Edit a testcase
-Launch `:CompetiTestAdd` to add a new testcase.\
-Launch `:CompetiTestEdit` to edit an existing testcase. If you want to specify testcase number directly in the command line you can use `:CompetiTestEdit x`, where `x` is a number representing the testcase you want to edit.
+Launch `:CompetiTest add_testcase` to add a new testcase.\
+Launch `:CompetiTest edit_testcase` to edit an existing testcase. If you want to specify testcase number directly in the command line you can use `:CompetiTest edit_testcase x`, where `x` is a number representing the testcase you want to edit.
 
 To jump between input and output windows press either `<C-h>`, `<C-l>`, or `<C-i>`. To save and close testcase editor press `<C-s>` or `:wq`.
 
 Of course these keybindings can be customized: see `editor_ui` ➤ `normal_mode_mappings` and `editor_ui` ➤ `insert_mode_mappings` in [configuration](#configuration)
 
 ### Remove a testcase
-Launch `:CompetiTestDelete`. If you want to specify testcase number directly in the command line you can use `:CompetiTestDelete x`, where `x` is a number representing the testcase you want to remove.
+Launch `:CompetiTest delete_testcase`. If you want to specify testcase number directly in the command line you can use `:CompetiTest delete_testcase x`, where `x` is a number representing the testcase you want to remove.
 
 ### Convert testcases
 Testcases can be stored in multiple text files or in a single [msgpack](https://msgpack.org/) encoded file.\
-Launch `:CompetiTestConvert` to change testcases storage method: you can convert a single file into multiple files or vice versa.
+Launch `:CompetiTest convert` to change testcases storage method: you can convert a single file into multiple files or vice versa.
 One of the following arguments is needed:
 - `singlefile_to_files`: convert a single file into multiple text files
 - `files_to_singlefile`: convert multiple text files into a single file
@@ -122,9 +120,9 @@ One of the following arguments is needed:
 **NOTE:** this command only converts already existing testcases files without changing CompetiTest configuration. To choose the storage method to use you have to [configure](#configuration) `testcases_use_single_file` option, that is false by default. Anyway storage method can be automatically detected when option `testcases_auto_detect_storage` is true.
 
 ### Run testcases
-Launch `:CompetiTestRun`. CompetiTest's interface will appear and you'll be able to view details about a testcase by moving the cursor over its entry. You can close the UI by pressing `q`, `Q` or `:q`.\
-If you're using a compiled language and you don't want to recompile your program launch `:CompetiTestRunNC`, where "NC" means "No Compile".\
-If you have previously closed the UI and you want to re-open it without re-executing testcases or recompiling launch `:CompetiTestRunNE`, where "NE" means "No Execute".
+Launch `:CompetiTest run`. CompetiTest's interface will appear and you'll be able to view details about a testcase by moving the cursor over its entry. You can close the UI by pressing `q`, `Q` or `:q`.\
+If you're using a compiled language and you don't want to recompile your program launch `:CompetiTest run_no_compile`.\
+If you have previously closed the UI and you want to re-open it without re-executing testcases or recompiling launch `:CompetiTest show_ui`.
 
 #### Control processes
 - Run again a testcase by pressing `R`
@@ -145,9 +143,9 @@ Of course all these keybindings can be customized: see `runner_ui` ➤ `mappings
 **NOTE:** to get this feature working you need to install [competitive-companion](https://github.com/jmerle/competitive-companion) extension in your browser.
 
 Thanks to its integration with [competitive-companion](https://github.com/jmerle/competitive-companion), CompetiTest can download contents from competitive programming platforms:
-- Download only testcases with `:CompetiTestReceive testcases`
-- Download a problem with `:CompetiTestReceive problem` (source file is automatically created along with testcases)
-- Download an entire contest with `:CompetiTestReceive contest` (make sure to be on the homepage of the contest, not of a single problem)
+- Download only testcases with `:CompetiTest receive testcases`
+- Download a problem with `:CompetiTest receive problem` (source file is automatically created along with testcases)
+- Download an entire contest with `:CompetiTest receive contest` (make sure to be on the homepage of the contest, not of a single problem)
 
 After launching one of these commands click on the green plus button in your browser to start downloading.\
 For further customization see receive options in [configuration](#configuration).
