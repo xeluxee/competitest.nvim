@@ -314,12 +314,14 @@ function M.receive(mode)
 		local bufnr = api.nvim_get_current_buf()
 		config.load_buffer_config(bufnr)
 		local bufcfg = config.get_buffer_config(bufnr)
-		receive.receive(bufcfg.companion_port, true, "testcases", function(tasks)
+		local notify_string = bufcfg.receive_print_message and "testcases" or nil
+		receive.receive(bufcfg.companion_port, true, notify_string, function(tasks)
 			receive.store_testcases(bufnr, tasks[1].tests, bufcfg.testcases_use_single_file)
 		end)
 	elseif mode == "problem" then
 		local setup = config.current_setup
-		receive.receive(setup.companion_port, true, "problem", function(tasks)
+		local notify_string = setup.receive_print_message and "problem" or nil
+		receive.receive(setup.companion_port, true, notify_string, function(tasks)
 			widgets.input(
 				"Choose problem path",
 				eval_path(setup.received_problems_path, tasks[1], setup.received_files_extension),
@@ -328,14 +330,15 @@ function M.receive(mode)
 				function(filepath)
 					receive.store_problem_config(filepath, true, tasks[1], setup)
 					if setup.open_received_problems then
-						vim.cmd("edit " .. filepath)
+						api.nvim_command("edit " .. filepath)
 					end
 				end
 			)
 		end)
 	elseif mode == "contest" then
 		local setup = config.current_setup
-		receive.receive(setup.companion_port, false, "contest", function(tasks)
+		local notify_string = setup.receive_print_message and "contest" or nil
+		receive.receive(setup.companion_port, false, notify_string, function(tasks)
 			widgets.input(
 				"Choose contest directory",
 				eval_path(setup.received_contests_directory, tasks[1], setup.received_files_extension),
@@ -353,7 +356,7 @@ function M.receive(mode)
 								local filepath = directory .. "/" .. eval_path(cfg.received_contests_problems_path, task, file_extension)
 								receive.store_problem_config(filepath, true, task, cfg)
 								if cfg.open_received_contests then
-									vim.cmd("edit " .. filepath)
+									api.nvim_command("edit " .. filepath)
 								end
 							end
 						end

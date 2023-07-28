@@ -72,13 +72,6 @@ function M.receive(port, single_task, notify, callback)
 			timer:stop()
 			timer:close()
 		end
-
-		vim.schedule(function()
-			if notify then
-				utils.notify(notify .. " received successfully!", "INFO")
-			end
-			callback(tasks)
-		end)
 	end
 
 	local message = {} -- received string
@@ -101,6 +94,12 @@ function M.receive(port, single_task, notify, callback)
 				tasks_number = tasks_number - 1
 				if tasks_number == 0 then
 					stop_receiving()
+					vim.schedule(function()
+						if notify then
+							utils.notify(notify .. " received successfully!", "INFO")
+						end
+						callback(tasks)
+					end)
 				end
 				message = {}
 			end
