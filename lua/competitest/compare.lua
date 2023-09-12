@@ -27,7 +27,7 @@ M.methods = {
 
 ---Compare output and expected output to determine if they can match
 ---@param output string: program's output
----@param expected_output string: expected result
+---@param expected_output string | nil: expected result, or nil when it isn't provided
 ---@param method string | function: can be "exact", "squish" or a custom function that receives two arguments
 ---@return boolean | nil: true if output matches expected output. Returns nil if there's no expected output to compare
 function M.compare_output(output, expected_output, method)

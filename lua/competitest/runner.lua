@@ -1,7 +1,6 @@
 local api = vim.api
 local luv = vim.loop
 local config = require("competitest.config")
-local compare = require("competitest.compare")
 local utils = require("competitest.utils")
 local ui = require("competitest.runner_ui")
 
@@ -67,13 +66,13 @@ function TCRunner:run_testcases(tctbl, compile)
 		end
 		self.compile = compile and self.cc ~= nil
 		if self.compile then -- if compilation is needed we add it as a testcase
-			table.insert(self.tcdata, { stdin = "", expout = nil, tcnum = "Compile" })
+			table.insert(self.tcdata, { stdin = {}, expout = nil, tcnum = "Compile" })
 		end
 		for tcnum, tc in pairs(tctbl) do
 			table.insert(self.tcdata, {
-				stdin = tc.input,
-				-- expout = expected output
-				expout = tc.output,
+				stdin = vim.split(tc.input, "\n", { plain = true }),
+				-- expout = expected output, can be table or nil
+				expout = tc.output and vim.split(tc.output, "\n", { plain = true }),
 				tcnum = tcnum,
 				timelimit = self.config.maximum_time,
 			})
@@ -84,8 +83,8 @@ function TCRunner:run_testcases(tctbl, compile)
 	for _, tc in pairs(self.tcdata) do
 		tc.status = ""
 		tc.hlgroup = "CompetiTestRunning"
-		tc.stdout = ""
-		tc.stderr = ""
+		tc.stdout = nil
+		tc.stderr = nil
 		tc.running = false
 		tc.killed = false
 		tc.time = nil
@@ -211,9 +210,21 @@ function TCRunner:execute_testcase(tcindex, exec, args, dir, callback)
 		return
 	end
 
-	luv.write(process.stdin, tc.stdin)
+	---Update array of lines with data received from stdout or stderr
+	---@param lines table
+	---@param received string
+	local function add_stream_lines(lines, received)
+		local received_lines = vim.split(string.gsub(received, "\r\n", "\n"), "\n", { plain = true })
+		local n = #lines
+		for _, line in ipairs(received_lines) do
+			lines[n] = (lines[n] or "") .. line
+			n = n + 1
+		end
+	end
+
+	luv.write(process.stdin, table.concat(tc.stdin, "\n"))
 	luv.shutdown(process.stdin)
-	tc.stdout = ""
+	tc.stdout = { "" }
 	luv.read_start(process.stdout, function(err, data)
 		if err or not data then
 			tc.process.stdout:read_stop()
@@ -221,7 +232,11 @@ function TCRunner:execute_testcase(tcindex, exec, args, dir, callback)
 			if not tc.running and tc.status ~= "RUNNING" then
 				return
 			end
-			local correct = compare.compare_output(tc.stdout, tc.expout, self.config.output_compare_method)
+			local correct = require("competitest.compare").compare_output(
+				table.concat(tc.stdout, "\n"),
+				tc.expout and table.concat(tc.expout, "\n"),
+				self.config.output_compare_method
+			)
 			if correct == true then
 				tc.status = "CORRECT"
 				tc.hlgroup = "CompetiTestCorrect"
@@ -234,18 +249,18 @@ function TCRunner:execute_testcase(tcindex, exec, args, dir, callback)
 			end
 			self:update_ui(true)
 		else
-			tc.stdout = tc.stdout .. string.gsub(data, "\r\n", "\n")
+			add_stream_lines(tc.stdout, data)
 			self:update_ui()
 		end
 	end)
-	tc.stderr = ""
+	tc.stderr = { "" }
 	luv.read_start(process.stderr, function(err, data)
 		if err or not data then
 			tc.process.stderr:read_stop()
 			tc.process.stderr:close()
 			return
 		end
-		tc.stderr = tc.stderr .. string.gsub(data, "\r\n", "\n")
+		add_stream_lines(tc.stderr, data)
 		self:update_ui()
 	end)
 
@@ -319,7 +334,9 @@ end
 ---@param update_windows boolean | nil: whether to update all the windows or only details windows
 function TCRunner:update_ui(update_windows)
 	if self.ui then
-		self.ui.update_windows = update_windows or false
+		if update_windows then -- avoid direct assignment to satisfy unprocessed previous update_windows requests
+			self.ui.update_windows = true
+		end
 		self.ui.update_details = true
 		self.ui:update_ui()
 	end

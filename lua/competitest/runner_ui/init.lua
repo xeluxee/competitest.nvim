@@ -405,9 +405,8 @@ function RunnerUI:update_ui()
 			end
 
 			local function set_buf_content(bufnr, content)
-				content = content or ""
 				api.nvim_buf_set_option(bufnr, "modifiable", true)
-				api.nvim_buf_set_lines(bufnr, 0, -1, false, vim.split(content, "\n"))
+				api.nvim_buf_set_lines(bufnr, 0, -1, false, content or {})
 				api.nvim_buf_set_option(bufnr, "modifiable", false)
 			end
 
