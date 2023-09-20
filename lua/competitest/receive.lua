@@ -119,10 +119,14 @@ end
 ---@param bufnr integer: buffer number
 ---@param tclist table: table containing received testcases
 ---@param use_single_file boolean: whether to store testcases in a single file or not
-function M.store_testcases(bufnr, tclist, use_single_file)
+---@param replace boolean: whether to replace existing testcases with received ones or to ask user what to do
+function M.store_testcases(bufnr, tclist, use_single_file, replace)
 	local tctbl = testcases.buf_get_testcases(bufnr)
 	if next(tctbl) ~= nil then
-		local choice = vim.fn.confirm("Some testcases already exist. Do you want to keep them along the new ones?", "&Keep\n&Replace\n&Cancel")
+		local choice = 2
+		if not replace then
+			choice = vim.fn.confirm("Some testcases already exist. Do you want to keep them along the new ones?", "&Keep\n&Replace\n&Cancel")
+		end
 		if choice == 2 then -- user chose "Replace"
 			if not use_single_file then
 				for tcnum, _ in pairs(tctbl) do -- delete existing files

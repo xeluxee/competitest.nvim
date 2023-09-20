@@ -325,6 +325,7 @@ require('competitest').setup {
 	received_contests_prompt_extension = true,
 	open_received_problems = true,
 	open_received_contests = true,
+	replace_received_testcases = false,
 }
 ```
 
@@ -451,9 +452,10 @@ require('competitest').setup {
 - `received_contests_directory`: directory where received contests are stored. It can be string or function, exactly as `received_problems_path`
 - `received_contests_problems_path`: relative path from contest root directory, each problem of a received contest is stored following this option. It can be string or function, exactly as `received_problems_path`
 - `received_contests_prompt_directory`: whether to ask user confirmation about the directory where received contests are stored or not
-- `received_contests_prompt_extension`: whether to ask user confirmation about what file extension to when receiving a contests or not
+- `received_contests_prompt_extension`: whether to ask user confirmation about what file extension to use when receiving a contest or not
 - `open_received_problems`: automatically open source files when receiving a single problem
 - `open_received_contests`: automatically open source files when receiving a contest
+- `replace_received_testcases`: this option applies when receiving only testcases. If true replace existing testcases with received ones, otherwise ask user what to do
 
 ### Local configuration
 You can use a different configuration for every different folder by creating a file called `.competitest.lua` (this name can be changed configuring the option `local_config_file_name`). It will affect every file contained in that folder and in subfolders. A table containing valid options must be returned, see the following example.

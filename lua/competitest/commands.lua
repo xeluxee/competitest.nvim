@@ -316,7 +316,7 @@ function M.receive(mode)
 		local bufcfg = config.get_buffer_config(bufnr)
 		local notify_string = bufcfg.receive_print_message and "testcases" or nil
 		receive.receive(bufcfg.companion_port, true, notify_string, function(tasks)
-			receive.store_testcases(bufnr, tasks[1].tests, bufcfg.testcases_use_single_file)
+			receive.store_testcases(bufnr, tasks[1].tests, bufcfg.testcases_use_single_file, bufcfg.replace_received_testcases)
 		end)
 	elseif mode == "problem" then
 		local setup = config.current_setup
