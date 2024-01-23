@@ -5,24 +5,6 @@ local utils = require("competitest.utils")
 local widgets = require("competitest.widgets")
 local M = {}
 
----Warn users about deprecated commands
----@param old_cmd string
----@param new_cmd string
----@param qargs string
-function M.deprecated_commands(old_cmd, new_cmd, qargs)
-	utils.notify(
-		string.format(
-			"the command 'CompetiTest%s' is deprecated and it will be removed soon.\nPlease use the new 'CompetiTest %s' command.",
-			old_cmd,
-			new_cmd
-		),
-		"WARN"
-	)
-	vim.defer_fn(function()
-		M.command(new_cmd .. " " .. qargs)
-	end, 5000)
-end
-
 ---Handle CompetiTest subcommands
 ---@param args string: command line arguments
 function M.command(args)

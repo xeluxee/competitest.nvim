@@ -156,44 +156,14 @@ function M.update_config_table(cfg_tbl, opts)
 		return vim.deepcopy(cfg_tbl or default_config)
 	end
 
+	--[[
+	-- check deprecated options
 	local function notify_warning(msg)
 		vim.schedule(function()
 			vim.notify("CompetiTest.nvim: " .. msg, vim.log.levels.WARN, { title = "CompetiTest" })
 		end)
 	end
-
-	-- check deprecated testcases options
-	if opts.testcases_files_format then
-		opts.testcases_input_file_format = string.gsub(opts.testcases_files_format, "%$%(INOUT%)", opts.input_name or "input")
-		opts.testcases_output_file_format = string.gsub(opts.testcases_files_format, "%$%(INOUT%)", opts.output_name or "output")
-		opts.testcases_files_format = nil
-		notify_warning(
-			"option 'testcases_files_format' has been deprecated in favour of 'testcases_input_file_format' and 'testcases_output_file_format'."
-		)
-	end
-	if opts.input_name then
-		opts.input_name = nil
-		notify_warning("option 'input_name' has been deprecated. See 'testcases_input_file_format'.")
-	end
-	if opts.output_name then
-		opts.output_name = nil
-		notify_warning("option 'output_name' has been deprecated. See 'testcases_output_file_format'.")
-	end
-	-- check deprecated ui options
-	if opts.runner_ui then
-		for _, option in ipairs({ "total_width", "total_height" }) do
-			if opts.runner_ui[option] then
-				opts.popup_ui = opts.popup_ui or {}
-				opts.popup_ui[option] = opts.runner_ui[option]
-				opts.runner_ui[option] = nil
-				notify_warning("option 'runner_ui." .. option .. "' has been deprecated in favour of 'popup_ui." .. option .. "'.")
-			end
-		end
-		if opts.runner_ui.selector_width then
-			opts.runner_ui.selector_width = nil
-			notify_warning("option 'runner_ui.selector_width' has been deprecated. See 'popup_ui.layout'.")
-		end
-	end
+	]]
 
 	local new_config = vim.tbl_deep_extend("force", cfg_tbl or default_config, opts)
 	-- commands arguments lists need to be replaced and not extended

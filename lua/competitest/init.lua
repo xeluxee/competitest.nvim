@@ -9,7 +9,7 @@ function M.setup(opts)
 	if not config.current_setup.loaded then
 		config.current_setup.loaded = true
 
-		-- CompetiTest commands
+		-- CompetiTest command
 		vim.cmd([[
 		function! s:command_completion(_, CmdLine, CursorPos) abort
 			let prefix = a:CmdLine[:a:CursorPos]
@@ -35,20 +35,6 @@ function M.setup(opts)
 			return ""
 		endfunction
 		command! -bar -nargs=* -complete=custom,s:command_completion CompetiTest lua require("competitest.commands").command(<q-args>)
-
-		let s:old_commands = [
-			\ ["Add", "add_testcase"],
-			\ ["Edit", "edit_testcase"],
-			\ ["Delete", "delete_testcase"],
-			\ ["Convert", "convert"],
-			\ ["Run", "run"],
-			\ ["RunNC", "run_no_compile"],
-			\ ["RunNE", "show_ui"],
-			\ ["Receive", "receive"],
-			\ ]
-		for cmd in s:old_commands
-			execute printf("command! -bar -nargs=* CompetiTest%s lua require('competitest.commands').deprecated_commands('%s', '%s', <q-args>)", cmd[0], cmd[0], cmd[1])
-		endfor
 		]])
 
 		-- create highlight groups
