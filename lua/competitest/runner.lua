@@ -115,6 +115,9 @@ function TCRunner:run_testcases(tctbl, compile)
 			return
 		end
 		if next_tc > tc_size then
+			if self.compile and self.config.remove_compiled_binary and vim.fn.filereadable(self.rc.exec) then
+				os.remove(self.rc.exec)
+			end
 			return
 		end
 		next_tc = next_tc + 1
