@@ -115,6 +115,11 @@ function TCRunner:run_testcases(tctbl, compile)
 			return
 		end
 		if next_tc > tc_size then
+			local sep = vim.fn.has("win32") and "\\" or "/"
+			local rc_exec = self.running_directory .. sep .. self.rc.exec
+			if self.compile and self.config.remove_compiled_binary and vim.fn.filereadable(rc_exec) then
+				os.remove(rc_exec)
+			end
 			return
 		end
 		next_tc = next_tc + 1
