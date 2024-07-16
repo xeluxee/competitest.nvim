@@ -288,6 +288,7 @@ require('competitest').setup {
 	save_current_file = true,
 	save_all_files = false,
 	compile_directory = ".",
+	remove_compiled_binary = false,
 	compile_command = {
 		c = { exec = "gcc", args = { "-Wall", "$(FNAME)", "-o", "$(FNOEXT)" } },
 		cpp = { exec = "g++", args = { "-Wall", "$(FNAME)", "-o", "$(FNOEXT)" } },
@@ -386,6 +387,7 @@ require('competitest').setup {
 - `save_current_file`: if true save current file before running testcases
 - `save_all_files`: if true save all the opened files before running testcases
 - `compile_directory`: execution directory of compiler, relatively to current file's path
+- `remove_compiled_binary`: if true remove compiled binary after running testcases
 - `compile_command`: configure the command used to compile code for every different language, see [here](#customize-compile-and-run-commands)
 - `running_directory`: execution directory of your solutions, relatively to current file's path
 - `run_command`: configure the command used to run your solutions for every different language, see [here](#customize-compile-and-run-commands)

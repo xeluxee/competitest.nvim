@@ -192,6 +192,27 @@ function TCRunner:run_testcases(tctbl, compile)
 	mut = math.min(tc_size, mut)
 	self.next_tc = 1
 
+	function self.run_next_tc(tcnum)
+		if tcnum then
+			if tcnum == 1 and self.compile then
+				self:execute_testcase(tcnum, self.cc.exec, self.cc.args, self.compile_directory)
+			else
+				self:execute_testcase(tcnum, self.rc.exec, self.rc.args, self.running_directory)
+			end
+			return
+		end
+		if next_tc > tc_size then
+			local sep = vim.fn.has("win32") and "\\" or "/"
+			local rc_exec = self.running_directory .. sep .. self.rc.exec
+			if self.compile and self.config.remove_compiled_binary and vim.fn.filereadable(rc_exec) then
+				os.remove(rc_exec)
+			end
+			return
+		end
+		next_tc = next_tc + 1
+		self:execute_testcase(next_tc - 1, self.rc.exec, self.rc.args, self.running_directory, self.run_next_tc)
+	end
+
 	local function run_first_testcases()
 		local starting_tc = self.next_tc
 		self.next_tc = self.next_tc + mut
