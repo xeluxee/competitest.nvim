@@ -38,7 +38,7 @@ function M.eval_receive_modifiers(str, task, file_extension, remove_illegal_char
 		["DATE"] = tostring(os.date(date_format)),
 	}
 
-	if remove_illegal_characters and vim.fn.has("win32") == 1 then
+	if remove_illegal_characters then
 		for modifier, value in pairs(receive_modifiers) do
 			if modifier ~= "HOME" and modifier ~= "CWD" then
 				receive_modifiers[modifier] = string.gsub(value, '[<>:"/\\|?*]', "_")
@@ -187,7 +187,7 @@ function M.store_problem_config(filepath, confirm_overwriting, task, cfg)
 	if template_file then
 		if cfg.evaluate_template_modifiers then
 			local str = utils.load_file_as_string(template_file)
-			local evaluated_str = M.eval_receive_modifiers(str, task, file_extension, false, cfg.date_format)
+			local evaluated_str = M.eval_receive_modifiers(str, task, file_extension, true, cfg.date_format)
 			utils.write_string_on_file(filepath, evaluated_str or "")
 		else
 			utils.create_directory(file_directory)
