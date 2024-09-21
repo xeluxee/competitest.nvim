@@ -38,7 +38,7 @@ function M.eval_receive_modifiers(str, task, file_extension, remove_illegal_char
 		["DATE"] = tostring(os.date(date_format)),
 	}
 
-	if remove_illegal_characters and vim.fn.has("win32") == 1 then
+	if remove_illegal_characters then
 		for modifier, value in pairs(receive_modifiers) do
 			if modifier ~= "HOME" and modifier ~= "CWD" then
 				receive_modifiers[modifier] = string.gsub(value, '[<>:"/\\|?*]', "_")
