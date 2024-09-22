@@ -125,7 +125,7 @@ function M.store_testcases(bufnr, tclist, use_single_file, replace)
 	if next(tctbl) ~= nil then
 		local choice = 2
 		if not replace then
-			choice = vim.fn.confirm("Some testcases already exist. Do you want to keep them along the new ones?", "&Keep\n&Replace\n&Cancel")
+			choice = vim.fn.confirm("Some testcases already exist. Do you want to keep them along the new ones?", "Keep\nReplace\nCancel")
 		end
 		if choice == 2 then -- user chose "Replace"
 			if not use_single_file then
@@ -134,7 +134,7 @@ function M.store_testcases(bufnr, tclist, use_single_file, replace)
 				end
 			end
 			tctbl = {}
-		elseif choice == 3 then -- user chose "Cancel"
+		elseif choice == 0 or choice == 3 then -- user pressed <esc> or chose "Cancel"
 			return
 		end
 	end
@@ -158,10 +158,10 @@ end
 ---@param cfg table: table containing CompetiTest configuration
 function M.store_problem_config(filepath, confirm_overwriting, task, cfg)
 	if confirm_overwriting and utils.does_file_exist(filepath) then
-		local choice = vim.fn.confirm('Do you want to overwrite "' .. filepath .. '"?', "&Yes\n&No")
-		if choice == 2 then
+		local choice = vim.fn.confirm('Do you want to overwrite "' .. filepath .. '"?', "Yes\nNo")
+		if choice == 0 or choice == 2 then
 			return
-		end -- user chose "No"
+		end -- user pressed <esc> or chose "No"
 	end
 
 	local file_extension = vim.fn.fnamemodify(filepath, ":e")

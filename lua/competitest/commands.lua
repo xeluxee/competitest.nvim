@@ -141,10 +141,10 @@ function M.delete_testcase(tcnum)
 		end
 		tcnum = item.id
 
-		local choice = vim.fn.confirm("Are you sure you want to delete Testcase " .. tcnum .. "?", "&Yes\n&No")
-		if choice == 2 then
+		local choice = vim.fn.confirm("Are you sure you want to delete Testcase " .. tcnum .. "?", "Yes\nNo")
+		if choice == 0 or choice == 2 then
 			return
-		end -- user chose "No"
+		end -- user pressed <esc> or chose "No"
 
 		if config.get_buffer_config(bufnr).testcases_use_single_file then
 			tctbl[tcnum] = nil
@@ -176,10 +176,10 @@ function M.convert_testcases(mode)
 			return
 		end
 		if not no_files then
-			local choice = vim.fn.confirm("Testcases files already exist, by proceeding they will be replaced.", "&Proceed\n&Cancel")
-			if choice == 2 then
+			local choice = vim.fn.confirm("Testcases files already exist, by proceeding they will be replaced.", "Proceed\nCancel")
+			if choice == 0 or choice == 2 then
 				return
-			end -- user chose "Cancel"
+			end -- user pressed <esc> or chose "Cancel"
 		end
 
 		for tcnum, _ in pairs(files_tctbl) do -- delete already existing files
@@ -195,10 +195,10 @@ function M.convert_testcases(mode)
 			return
 		end
 		if not no_singlefile then
-			local choice = vim.fn.confirm("Testcases single file already exists, by proceeding it will be replaced.", "&Proceed\n&Cancel")
-			if choice == 2 then
+			local choice = vim.fn.confirm("Testcases single file already exists, by proceeding it will be replaced.", "Proceed\nCancel")
+			if choice == 0 or choice == 2 then
 				return
-			end -- user chose "Cancel"
+			end -- user pressed <esc> or chose "Cancel"
 		end
 
 		for tcnum, _ in pairs(files_tctbl) do -- delete already existing files
