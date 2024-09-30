@@ -310,8 +310,9 @@ function M.receive(mode)
 				setup.floating_border,
 				not setup.received_problems_prompt_path,
 				function(filepath)
-					receive.store_problem_config(filepath, true, tasks[1], setup)
-					if setup.open_received_problems then
+					local cfg = config.load_local_config_and_extend(vim.fn.fnamemodify(filepath, ":h"))
+					receive.store_problem_config(filepath, true, tasks[1], cfg)
+					if cfg.open_received_problems then
 						api.nvim_command("edit " .. filepath)
 					end
 				end
