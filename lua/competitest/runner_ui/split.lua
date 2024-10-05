@@ -30,8 +30,10 @@ function M.init_ui(windows, config, init_winid)
 	split_settings.win_options.relativenumber = config.runner_ui.show_rnu
 	settings.si = vim.deepcopy(split_settings)
 	settings.so = vim.deepcopy(split_settings)
+	settings.so.diff = true
 	settings.se = vim.deepcopy(split_settings)
 	settings.eo = vim.deepcopy(split_settings)
+	settings.eo.diff = true
 
 	---Get first windows in the given layout
 	---@param layout table: layout description
@@ -80,6 +82,9 @@ function M.init_ui(windows, config, init_winid)
 				vim.wo[windows_id[i]][winfixdim] = false -- unfix current window size
 				vim.api["nvim_win_set_" .. dimension](windows_id[i - 1], windows_sizes[i - 1]) -- set previous window size
 				vim.wo[windows_id[i - 1]][winfixdim] = true -- fix previous window size
+				if settings[fw].diff then
+					vim.fn.win_execute(windows_id[i], "diffthis")
+				end
 			end
 		end
 		vim.wo[windows_id[#layout]][winfixdim] = true -- fix last window size
