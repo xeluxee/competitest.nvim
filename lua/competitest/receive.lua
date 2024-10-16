@@ -21,12 +21,19 @@ function M.eval_receive_modifiers(str, task, file_extension, remove_illegal_char
 		contest = string.sub(task.group, hyphen + 3)
 	end
 
+	-- New function to process the problem name
+	local function process_problem_name(name)
+		name = name:gsub("%s+", "_") -- Replace spaces with underscores
+		name = name:gsub("%.", "") -- Remove periods
+		return name
+	end
+
 	local receive_modifiers = {
 		[""] = "$", -- $(): replace it with a dollar
 		["HOME"] = luv.os_homedir(), -- home directory
 		["CWD"] = vim.fn.getcwd(), -- current working directory
 		["FEXT"] = file_extension,
-		["PROBLEM"] = task.name, -- problem name, name field
+		["PROBLEM"] = process_problem_name(task.name), -- problem name, name field, processed
 		["GROUP"] = task.group, -- judge and contest name, group field
 		["JUDGE"] = judge, -- first part of group, before hyphen
 		["CONTEST"] = contest, -- second part of group, after hyphen
