@@ -313,7 +313,7 @@ function M.receive(mode)
 					local cfg = config.load_local_config_and_extend(vim.fn.fnamemodify(filepath, ":h"))
 					receive.store_problem_config(filepath, true, tasks[1], cfg)
 					if cfg.open_received_problems then
-						api.nvim_command("edit " .. filepath)
+						api.nvim_command("edit " .. vim.fn.fnameescape(filepath))
 					end
 				end
 			)
@@ -339,7 +339,7 @@ function M.receive(mode)
 								local filepath = directory .. "/" .. eval_path(cfg.received_contests_problems_path, task, file_extension)
 								receive.store_problem_config(filepath, true, task, cfg)
 								if cfg.open_received_contests then
-									api.nvim_command("edit " .. filepath)
+									api.nvim_command("edit " .. vim.fn.fnameescape(filepath))
 								end
 							end
 						end
