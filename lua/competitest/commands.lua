@@ -301,7 +301,7 @@ function M.receive(mode)
 			receive.store_testcases(bufnr, tasks[1].tests, bufcfg.testcases_use_single_file, bufcfg.replace_received_testcases)
 		end)
 	elseif mode == "problem" then
-		local setup = config.current_setup
+		local setup = config.load_local_config_and_extend(vim.fn.getcwd())
 		local notify_string = setup.receive_print_message and "problem" or nil
 		receive.receive(setup.companion_port, true, notify_string, function(tasks)
 			widgets.input(
@@ -319,7 +319,7 @@ function M.receive(mode)
 			)
 		end)
 	elseif mode == "contest" then
-		local setup = config.current_setup
+		local setup = config.load_local_config_and_extend(vim.fn.getcwd())
 		local notify_string = setup.receive_print_message and "contest" or nil
 		receive.receive(setup.companion_port, false, notify_string, function(tasks)
 			widgets.input(
