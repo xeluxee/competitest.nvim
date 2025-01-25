@@ -1,11 +1,12 @@
 local luv = vim.loop
 local M = {}
 
----Show a CompetiTest notification with vim.notify()
----@param msg string: message to display
----@param log_level string | nil: a log level among the ones available in vim.log.levels. When nil it defaults to ERROR
-function M.notify(msg, log_level)
-	vim.notify("CompetiTest.nvim: " .. msg, vim.log.levels[log_level or "ERROR"], { title = "CompetiTest" })
+---Show a notification message
+---@param msg string: message to show
+function M.notify(msg)
+	vim.schedule(function()
+		vim.api.nvim_echo({ { "CompetiTest: " .. msg, "Normal" } }, true, {})
+	end)
 end
 
 ---Convert a string with CompetiTest modifiers into a formatted string
@@ -86,6 +87,9 @@ M.file_format_modifiers = {
 
 	-- $(TCNUM): testcase number; it will be set later
 	["TCNUM"] = nil,
+
+	-- $(SEED): stress test seed; it will be set later
+	["SEED"] = nil,
 }
 
 ---Convert a string with CompetiTest file-format modifiers into a formatted string

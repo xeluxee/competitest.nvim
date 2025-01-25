@@ -57,6 +57,14 @@ local default_config = {
 			close_mappings = { "q", "Q" },
 		},
 	},
+	stress_ui = { -- user interface used by CompetiTest stress
+		width = 0.5, -- from 0 to 1
+		height = 0.6, -- from 0 to 1
+		mappings = {
+			pause = "K", -- pause/continue stress test
+			close = "q", -- stop and exit stress test
+		},
+	},
 	popup_ui = {
 		total_width = 0.8, -- from 0 to 1, total width of popup ui
 		total_height = 0.8, -- from 0 to 1, total height of popup ui
@@ -117,6 +125,21 @@ local default_config = {
 		rust = { exec = "./$(FNOEXT)" },
 		python = { exec = "python", args = { "$(FNAME)" } },
 		java = { exec = "java", args = { "$(FNOEXT)" } },
+	},
+	stress = {
+		generator = {
+			exec = "./$(FNOEXT)_gen",
+			args = { "$(SEED)" },
+		},
+		correct = {
+			exec = "./$(FNOEXT)_correct",
+		},
+		solution = {
+			exec = "./$(FNOEXT)",
+		},
+		time_limit = 5000, -- Time limit for each test case (ms)
+		seed_range = { 1, 1000000000 }, -- Range of random seeds
+		auto_continue = true, -- Whether to continue testing automatically
 	},
 	multiple_testing = -1, -- how many testcases to run at the same time. Set it to 0 to run all them together, -1 to use amount of available parallelism, or any positive number to run how many testcases you want
 	maximum_time = 5000, -- maximum time (in milliseconds) given to a process. If it's excedeed process will be killed

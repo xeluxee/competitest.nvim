@@ -25,6 +25,7 @@
 - Testcases can be stored in a single file or in multiple text files, see [usage notes](#usage-notes)
 - Easily [add](#add-or-edit-a-testcase), [edit](#add-or-edit-a-testcase) and [delete](#remove-a-testcase) testcases
 - [Run](#run-testcases) your program across all the testcases, showing results and execution data in a nice interactive UI
+- [Stress test](#stress-testing) your program with random test cases, comparing outputs with a correct solution
 - [Download](#receive-testcases-problems-and-contests) testcases, problems and contests automatically from competitive programming platforms
 - [Templates](#templates-for-received-problems-and-contests) for received problems and contests
 - View diff between actual and expected output
@@ -195,6 +196,18 @@ int main() {
 }
 ```
 
+## Stress Testing
+Launch `:CompetiTest stress` to start stress testing your program. The stress test window will appear showing:
+- Current status (Running/Stopped)
+- Runtime and number of tests passed
+- Current test seed and failed seeds
+- Generator, correct program and solution outputs when a test fails
+
+You can control the stress test with:
+- `K` to pause/continue testing
+- `q` to stop and exit
+
+
 ## Configuration
 ### Full configuration
 Here you can find CompetiTest default configuration
@@ -256,13 +269,27 @@ require('competitest').setup {
 			close_mappings = { "q", "Q" },
 		},
 	},
+	stress_ui = {
+		width = 0.5,
+		height = 0.6,
+		mappings = {
+			pause = "K",
+			close = "q",
+		},
+	},
 	popup_ui = {
 		total_width = 0.8,
 		total_height = 0.8,
 		layout = {
-			{ 4, "tc" },
-			{ 5, { { 1, "so" }, { 1, "si" } } },
-			{ 5, { { 1, "eo" }, { 1, "se" } } },
+			{ 3, "tc" },
+			{ 4, {
+				{ 1, "so" },
+				{ 1, "si" },
+			} },
+			{ 4, {
+				{ 1, "eo" },
+				{ 1, "se" },
+			} },
 		},
 	},
 	split_ui = {
@@ -298,6 +325,21 @@ require('competitest').setup {
 		rust = { exec = "./$(FNOEXT)" },
 		python = { exec = "python", args = { "$(FNAME)" } },
 		java = { exec = "java", args = { "$(FNOEXT)" } },
+	},
+	stress = {
+		generator = {
+			exec = "./$(FNOEXT)_gen",
+			args = { "$(SEED)" },
+		},
+		correct = {
+			exec = "./$(FNOEXT)_correct",
+		},
+		solution = {
+			exec = "./$(FNOEXT)",
+		},
+		time_limit = 5000,
+		seed_range = { 1, 1000000000 },
+		auto_continue = true,
 	},
 	multiple_testing = -1,
 	maximum_time = 5000,
@@ -379,6 +421,17 @@ require('competitest').setup {
 	- `vertical_layout`: a table describing vertical split UI layout. For further details see [here](#customize-ui-layout)
 	- `total_height`: a value from 0 to 1, representing the ratio between total **horizontal** split height and relative window height
 	- `horizontal_layout`: a table describing horizontal split UI layout. For further details see [here](#customize-ui-layout)
+- `stress`: settings related to stress testing
+	- `generator`: settings related to stress test generator
+		- `exec`: command used to generate testcases
+		- `args`: arguments passed to the generator command
+	- `correct`: settings related to stress test correct program
+		- `exec`: command used to run correct program
+	- `solution`: settings related to stress test solution program
+		- `exec`: command used to run solution program
+	- `time_limit`: time limit for each test case, in milliseconds
+	- `seed_range`: range of random seeds
+	- `auto_continue`: whether to continue testing automatically
 - `save_current_file`: if true save current file before running testcases
 - `save_all_files`: if true save all the opened files before running testcases
 - `compile_directory`: execution directory of compiler, relatively to current file's path

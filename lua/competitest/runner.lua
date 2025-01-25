@@ -311,9 +311,6 @@ end
 
 ---Show Runner UI
 function TCRunner:show_ui()
-	if not self.tcdata then -- nothing to show
-		return
-	end
 	if not self.ui then
 		self.ui = ui:new(self)
 	end
@@ -346,6 +343,409 @@ function TCRunner:resize_ui()
 	if self.ui then
 		self.ui:resize_ui()
 	end
+end
+
+---@class StressData
+---@field running boolean Whether it is running
+---@field passed integer Number of passed tests
+---@field failed_seeds table List of failed seeds
+---@field current_seed integer Current test seed
+---@field outputs table Current test outputs
+---@field start_time integer Start time
+
+---Run stress test
+---@param self TCRunner
+function TCRunner:run_stress_test()
+	if self.config.save_all_files then
+		api.nvim_command("wa")
+	elseif self.config.save_current_file then
+		api.nvim_buf_call(self.bufnr, function()
+			api.nvim_command("w")
+		end)
+	end
+
+	-- Clean up normal test data
+	self.tcdata = nil
+
+	-- Initialize stress test data
+	self.stress_data = {
+		running = true,
+		passed = 0,
+		failed_seeds = {},
+		current_seed = nil,
+		outputs = {},
+		start_time = os.time(),
+		error_messages = {},
+	}
+
+	-- Show stress test window
+	if not self.ui then
+		self.ui = ui:new(self)
+	end
+	self.ui:show_ui()
+
+	-- Check if stress test configuration is complete
+	if not self.config.stress then
+		table.insert(self.stress_data.error_messages, "Stress test configuration not found")
+		self.stress_data.running = false
+		self:update_stress_ui()
+		return
+	end
+
+	if not self.config.stress.generator or not self.config.stress.generator.exec then
+		table.insert(self.stress_data.error_messages, "Generator not configured")
+		self.stress_data.running = false
+		self:update_stress_ui()
+		return
+	end
+
+	if not self.config.stress.correct or not self.config.stress.correct.exec then
+		table.insert(self.stress_data.error_messages, "Correct program not configured")
+		self.stress_data.running = false
+		self:update_stress_ui()
+		return
+	end
+
+	if not self.config.stress.solution or not self.config.stress.solution.exec then
+		table.insert(self.stress_data.error_messages, "Program under test not configured")
+		self.stress_data.running = false
+		self:update_stress_ui()
+		return
+	end
+
+	-- 预处理所有需要的字符串
+	local gen_exec = utils.buf_eval_string(self.bufnr, self.config.stress.generator.exec, nil)
+	local gen_args = {}
+	for _, arg in ipairs(self.config.stress.generator.args or {}) do
+		if arg == "$(SEED)" then
+			self.stress_data.gen_seed_index = #gen_args + 1
+			table.insert(gen_args, "$(SEED)")
+		else
+			local processed_arg = utils.buf_eval_string(self.bufnr, arg, nil)
+			if not processed_arg then
+				table.insert(self.stress_data.error_messages, string.format("无法处理生成器参数 '%s'", arg))
+				self.stress_data.running = false
+				self:update_stress_ui()
+				return
+			end
+			table.insert(gen_args, processed_arg)
+		end
+	end
+	self.stress_data.gen_exec = gen_exec
+	self.stress_data.gen_args = gen_args
+
+	local correct_exec = utils.buf_eval_string(self.bufnr, self.config.stress.correct.exec, nil)
+	local correct_args = {}
+	for _, arg in ipairs(self.config.stress.correct.args or {}) do
+		table.insert(correct_args, utils.buf_eval_string(self.bufnr, arg, nil))
+	end
+	self.stress_data.correct_exec = correct_exec
+	self.stress_data.correct_args = correct_args
+
+	local solution_exec = utils.buf_eval_string(self.bufnr, self.config.stress.solution.exec, nil)
+	local solution_args = {}
+	for _, arg in ipairs(self.config.stress.solution.args or {}) do
+		table.insert(solution_args, utils.buf_eval_string(self.bufnr, arg, nil))
+	end
+	self.stress_data.solution_exec = solution_exec
+	self.stress_data.solution_args = solution_args
+
+	-- 编译当前程序
+	if self.cc then
+		-- 直接执行编译命令，不创建 tcdata
+		self:execute_testcase_without_ui(self.cc.exec, self.cc.args, self.compile_directory, function(success)
+			if success then
+				self:start_stress_test()
+			else
+				table.insert(self.stress_data.error_messages, "编译失败")
+				self.stress_data.running = false
+				self:update_stress_ui()
+			end
+		end)
+	else
+		self:start_stress_test()
+	end
+end
+
+---执行命令但不显示界面
+---@param exec string 可执行文件
+---@param args table 参数列表
+---@param dir string 工作目录
+---@param callback function 回调函数
+function TCRunner:execute_testcase_without_ui(exec, args, dir, callback)
+	local process = {
+		exec = exec,
+		args = args,
+		stdin = luv.new_pipe(false),
+		stdout = luv.new_pipe(false),
+		stderr = luv.new_pipe(false),
+	}
+
+	utils.create_directory(dir)
+	process.handle, process.pid = luv.spawn(process.exec, {
+		args = process.args,
+		cwd = dir,
+		stdio = { process.stdin, process.stdout, process.stderr },
+	}, function(code, signal)
+		process.stdin:close()
+		process.stdout:close()
+		process.stderr:close()
+		process.handle:close()
+		callback(code == 0)
+	end)
+
+	if not process.handle then
+		callback(false)
+		return
+	end
+
+	luv.shutdown(process.stdin)
+end
+
+---执行对拍进程
+---@param self TCRunner
+---@param name string 进程名称
+---@param exec string 可执行文件
+---@param args table 参数列表
+---@param callback function 回调函数
+function TCRunner:execute_stress_process(name, exec, args, callback)
+	local stdout = luv.new_pipe(false)
+	local stderr = luv.new_pipe(false)
+	local handle
+	local timer
+
+	local function on_exit(code, signal)
+		if timer then
+			timer:stop()
+			timer:close()
+		end
+		if handle then
+			handle:close()
+		end
+		if stdout then
+			stdout:close()
+		end
+		if stderr then
+			stderr:close()
+		end
+
+		self.stress_data.outputs[name] = {
+			stdout = self.stress_data.outputs[name].stdout,
+			stderr = self.stress_data.outputs[name].stderr,
+			exit_code = code,
+			signal = signal,
+		}
+
+		callback(code == 0)
+	end
+
+	-- 初始化输出缓冲区
+	self.stress_data.outputs[name] = {
+		stdout = {},
+		stderr = {},
+	}
+
+	-- 检查可执行文件是否存在
+	if not utils.does_file_exist(exec) then
+		self.stress_data.outputs[name] = {
+			stdout = {},
+			stderr = {},
+			exit_code = -1,
+			signal = 0,
+		}
+		callback(false)
+		return
+	end
+
+	handle = luv.spawn(exec, {
+		args = args,
+		cwd = self.running_directory,
+		stdio = { nil, stdout, stderr }
+	}, on_exit)
+
+	if not handle then
+		self.stress_data.outputs[name] = {
+			stdout = {},
+			stderr = { "无法启动进程" },
+			exit_code = -1,
+			signal = 0,
+		}
+		callback(false)
+		return
+	end
+
+	luv.read_start(stdout, function(err, data)
+		if err then
+			table.insert(self.stress_data.outputs[name].stderr, "stdout 读取错误")
+			return
+		end
+		if data then
+			table.insert(self.stress_data.outputs[name].stdout, data)
+		end
+	end)
+
+	luv.read_start(stderr, function(err, data)
+		if err then
+			table.insert(self.stress_data.outputs[name].stderr, "stderr 读取错误")
+			return
+		end
+		if data then
+			table.insert(self.stress_data.outputs[name].stderr, data)
+		end
+	end)
+
+	timer = luv.new_timer()
+	timer:start(self.config.stress.time_limit, 0, function()
+		if handle then
+			table.insert(self.stress_data.outputs[name].stderr, "进程超时")
+			handle:kill(9)
+		end
+	end)
+end
+
+---Start stress test
+---@param self TCRunner
+function TCRunner:start_stress_test()
+	local function generate_seed()
+		return math.random(self.config.stress.seed_range[1], self.config.stress.seed_range[2])
+	end
+
+	local function run_stress_iteration()
+		if not self.stress_data.running then
+			return
+		end
+
+		local seed = generate_seed()
+		self.stress_data.current_seed = seed
+		self.stress_data.outputs = {}
+
+		-- Replace seed in generator arguments
+		local gen_args = vim.deepcopy(self.stress_data.gen_args)
+		if self.stress_data.gen_seed_index then
+			gen_args[self.stress_data.gen_seed_index] = tostring(seed)
+		end
+
+		-- Run generator
+		self:execute_stress_process("generator", self.stress_data.gen_exec, gen_args, function(success)
+			if not success then
+				vim.schedule(function()
+					utils.notify("Generator failed to run")
+					utils.notify(string.format("Generator path: %s", self.stress_data.gen_exec))
+					utils.notify(string.format("Generator arguments: %s", table.concat(gen_args, " ")))
+					utils.notify(string.format("Working directory: %s", self.running_directory))
+					if #self.stress_data.outputs.generator.stderr > 0 then
+						for _, line in ipairs(self.stress_data.outputs.generator.stderr) do
+							if line and line ~= "" then
+								utils.notify(string.format("Generator error output: %s", line))
+							end
+						end
+					end
+				end)
+				return
+			end
+
+			-- Run correct program
+			self:execute_stress_process("correct", self.stress_data.correct_exec, self.stress_data.correct_args, function(success)
+				if not success then
+					vim.schedule(function()
+						utils.notify("Correct program failed to run")
+						utils.notify(string.format("Correct program path: %s", self.stress_data.correct_exec))
+						utils.notify(string.format("Correct program arguments: %s", table.concat(self.stress_data.correct_args, " ")))
+						utils.notify(string.format("Working directory: %s", self.running_directory))
+						if #self.stress_data.outputs.correct.stderr > 0 then
+							for _, line in ipairs(self.stress_data.outputs.correct.stderr) do
+								if line and line ~= "" then
+									utils.notify(string.format("Correct program error output: %s", line))
+								end
+							end
+						end
+					end)
+					return
+				end
+
+				-- Run program under test
+				self:execute_stress_process("solution", self.stress_data.solution_exec, self.stress_data.solution_args, function(success)
+					if not success then
+						vim.schedule(function()
+							local error_messages = {
+								"Program under test failed to run",
+								string.format("Program under test path: %s", self.stress_data.solution_exec),
+								string.format("Program under test arguments: %s", table.concat(self.stress_data.solution_args, " ")),
+								string.format("Working directory: %s", self.running_directory),
+							}
+							if #self.stress_data.outputs.solution.stderr > 0 then
+								for _, line in ipairs(self.stress_data.outputs.solution.stderr) do
+									if line and line ~= "" then
+										table.insert(error_messages, string.format("Error output: %s", line))
+									end
+								end
+							end
+							for _, msg in ipairs(error_messages) do
+								utils.notify(msg)
+							end
+						end)
+						return
+					end
+
+					-- Compare outputs
+					local correct_output = table.concat(self.stress_data.outputs.correct.stdout or {}, "\n")
+					local solution_output = table.concat(self.stress_data.outputs.solution.stdout or {}, "\n")
+
+					if correct_output ~= solution_output then
+						table.insert(self.stress_data.failed_seeds, seed)
+						self.stress_data.running = false
+						vim.schedule(function()
+							local error_messages = {
+								string.format("Stress test failed: seed %d", seed),
+								"",
+								"Generator output:",
+							}
+							for _, line in ipairs(self.stress_data.outputs.generator.stdout) do
+								if line and line ~= "" then
+									table.insert(error_messages, string.format("  %s", line))
+								end
+							end
+							table.insert(error_messages, "")
+							table.insert(error_messages, "Correct program output:")
+							for _, line in ipairs(self.stress_data.outputs.correct.stdout) do
+								if line and line ~= "" then
+									table.insert(error_messages, string.format("  %s", line))
+								end
+							end
+							table.insert(error_messages, "")
+							table.insert(error_messages, "Solution output:")
+							for _, line in ipairs(self.stress_data.outputs.solution.stdout) do
+								if line and line ~= "" then
+									table.insert(error_messages, string.format("  %s", line))
+								end
+							end
+							for _, msg in ipairs(error_messages) do
+								utils.notify(msg)
+							end
+						end)
+						self:update_stress_ui()
+					else
+						self.stress_data.passed = self.stress_data.passed + 1
+						self:update_stress_ui()
+						if self.config.stress.auto_continue then
+							vim.defer_fn(run_stress_iteration, 0)
+						end
+					end
+				end)
+			end)
+		end)
+	end
+
+	math.randomseed(os.time())
+	self.stress_data.running = true
+	run_stress_iteration()
+end
+
+---Update stress test UI
+---@param self TCRunner
+function TCRunner:update_stress_ui()
+	if not self.ui then return end
+	self.ui:update_stress_view(self.stress_data)
 end
 
 return TCRunner
