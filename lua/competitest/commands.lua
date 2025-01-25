@@ -76,6 +76,11 @@ function M.command(args)
 				M.receive(args[2])
 			end
 		end,
+		stress = function()
+			if check_subargs(0, 0) then
+				M.run_stress_test()
+			end
+		end,
 	}
 
 	local sub = subcommands[args[1]]
@@ -301,7 +306,7 @@ function M.receive(mode)
 			receive.store_testcases(bufnr, tasks[1].tests, bufcfg.testcases_use_single_file, bufcfg.replace_received_testcases)
 		end)
 	elseif mode == "problem" then
-		local setup = config.current_setup
+		local setup = config.load_local_config_and_extend(vim.fn.getcwd())
 		local notify_string = setup.receive_print_message and "problem" or nil
 		receive.receive(setup.companion_port, true, notify_string, function(tasks)
 			widgets.input(
@@ -319,7 +324,7 @@ function M.receive(mode)
 			)
 		end)
 	elseif mode == "contest" then
-		local setup = config.current_setup
+		local setup = config.load_local_config_and_extend(vim.fn.getcwd())
 		local notify_string = setup.receive_print_message and "contest" or nil
 		receive.receive(setup.companion_port, false, notify_string, function(tasks)
 			widgets.input(
@@ -350,6 +355,26 @@ function M.receive(mode)
 	else
 		utils.notify("receive: unrecognized mode '" .. tostring(mode) .. "'.")
 	end
+end
+
+---Run stress test
+function M.run_stress_test()
+	local bufnr = api.nvim_get_current_buf()
+	config.load_buffer_config(bufnr)
+
+	if not M.runners[bufnr] then
+		M.runners[bufnr] = require("competitest.runner"):new(api.nvim_get_current_buf())
+		if not M.runners[bufnr] then
+			return
+		end
+		api.nvim_command("autocmd BufUnload <buffer=" .. bufnr .. "> lua require('competitest.commands').remove_runner(vim.fn.expand('<abuf>'))")
+	end
+
+	local r = M.runners[bufnr]
+	r:kill_all_processes()
+	r:run_stress_test()
+	r:set_restore_winid(api.nvim_get_current_win())
+	r:show_ui()
 end
 
 return M

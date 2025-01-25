@@ -1,6 +1,7 @@
 local api = vim.api
 local nui_event = require("nui.utils.autocmd").event
 local utils = require("competitest.utils")
+local Popup = require("nui.popup")
 
 local RunnerUI = {}
 RunnerUI.__index = RunnerUI
@@ -62,9 +63,30 @@ function RunnerUI:resize_ui()
 	end
 end
 
----Show Runner UI if not already shown
----It initializes UI if called for the first time or resized
+---Show Runner UI
 function RunnerUI:show_ui()
+	-- If in stress test mode, only show stress test window
+	if self.runner.stress_data and not self.runner.tcdata then
+		-- Clean up existing normal test windows
+		if self.ui_initialized then
+			self:delete()
+		end
+		self:show_stress_ui()
+		self:update_stress_view(self.runner.stress_data)
+		return
+	end
+
+	-- If in normal test mode but no test data, return directly
+	if not self.runner.tcdata or next(self.runner.tcdata) == nil then
+		return
+	end
+
+	-- Clean up existing stress test windows
+	if self.windows.stress then
+		self.windows.stress:unmount()
+		self.windows.stress = nil
+	end
+
 	if not self.ui_initialized or (self.interface.init_ui_only and not self.ui_visible) then -- initialize ui
 		self.interface.init_ui(self.windows, self.runner.config, self.restore_winid)
 
@@ -353,7 +375,18 @@ end
 ---Update Runner UI
 function RunnerUI:update_ui()
 	vim.schedule(function()
-		if not self.ui_visible or next(self.runner.tcdata) == nil then
+		if not self.ui_visible then
+			return
+		end
+
+		-- If in stress test mode and has stress test data
+		if self.runner.stress_data and not self.runner.tcdata then
+			self:update_stress_view(self.runner.stress_data)
+			return
+		end
+
+		-- If in normal test mode
+		if not self.runner.tcdata or next(self.runner.tcdata) == nil then
 			return
 		end
 
@@ -420,6 +453,182 @@ function RunnerUI:update_ui()
 			self.make_viewer_visible = nil
 			self:show_viewer_popup()
 		end
+	end)
+end
+
+---显示对拍界面
+---@param self RunnerUI
+function RunnerUI:show_stress_ui()
+	if not self.windows.stress then
+		local vim_width, vim_height = utils.get_ui_size()
+		local width = math.max(40, math.floor(vim_width * self.runner.config.stress_ui.width))
+		local height = math.max(20, math.floor(vim_height * self.runner.config.stress_ui.height))
+
+		local popup_options = {
+			enter = true,
+			focusable = true,
+			border = {
+				style = self.runner.config.floating_border,
+				highlight = self.runner.config.floating_border_highlight,
+				text = {
+					top = " Stress Test ",
+					top_align = "center",
+				},
+			},
+			relative = "editor",
+			position = {
+				row = math.floor((vim_height - height) / 2),
+				col = math.floor((vim_width - width) / 2),
+			},
+			size = {
+				width = width,
+				height = height,
+			},
+			buf_options = {
+				modifiable = true,
+				buftype = "nofile",
+				swapfile = false,
+			},
+			win_options = {
+				number = false,
+				relativenumber = false,
+				cursorline = true,
+				wrap = false,
+			},
+		}
+
+		self.windows.stress = Popup(popup_options)
+		self.windows.stress:mount()
+
+		-- 设置按键映射
+		for action, maps in pairs(self.runner.config.stress_ui.mappings) do
+			if type(maps) == "string" then -- turn string into table
+				self.runner.config.stress_ui.mappings[action] = { maps }
+			end
+		end
+
+		-- 暂停/继续对拍
+		for _, map in ipairs(self.runner.config.stress_ui.mappings.pause) do
+			self.windows.stress:map("n", map, function()
+				if self.runner.stress_data.running then
+					self.runner.stress_data.running = false
+				else
+					self.runner:start_stress_test()
+				end
+			end, { noremap = true })
+		end
+
+		-- 停止并退出对拍
+		local function close_stress_window()
+			if self.runner and self.runner.stress_data then
+				self.runner.stress_data.running = false
+			end
+			self:hide_stress_ui()
+		end
+
+		for _, map in ipairs(self.runner.config.stress_ui.mappings.close) do
+			self.windows.stress:map("n", map, close_stress_window, { noremap = true })
+			self.windows.stress:on(nui_event.QuitPre, close_stress_window)
+		end
+	end
+
+	self.windows.stress:show()
+end
+
+---隐藏对拍界面
+---@param self RunnerUI
+function RunnerUI:hide_stress_ui()
+	if self.windows.stress then
+		self.windows.stress:hide()
+		if self.restore_winid and api.nvim_win_is_valid(self.restore_winid) then
+			api.nvim_set_current_win(self.restore_winid)
+		end
+	end
+end
+
+---删除对拍界面
+---@param self RunnerUI
+function RunnerUI:delete_stress_ui()
+	if self.windows.stress then
+		self.windows.stress:unmount()
+		self.windows.stress = nil
+		if self.restore_winid and api.nvim_win_is_valid(self.restore_winid) then
+			api.nvim_set_current_win(self.restore_winid)
+		end
+	end
+end
+
+---更新对拍窗口
+---@param self RunnerUI
+---@param stress_data StressData
+function RunnerUI:update_stress_view(stress_data)
+	if not self.windows.stress then
+		self:show_stress_ui()
+		return
+	end
+
+	local lines = {}
+	local status = "RUNNING"
+	if not stress_data.running then
+		if stress_data.error_messages and #stress_data.error_messages > 0 then
+			status = "ERROR: " .. stress_data.error_messages[1]
+		else
+			status = "STOPPED"
+		end
+	end
+
+	table.insert(lines, string.format("Status: %s", status))
+	table.insert(lines, string.format("Tests Passed: %d", stress_data.passed or 0))
+	table.insert(lines, string.format("Current Seed: %d", stress_data.current_seed or 0))
+	table.insert(lines, "")
+
+	-- 只在对拍失败时显示输出
+	if not stress_data.running and stress_data.error_messages and #stress_data.error_messages > 0 
+		and stress_data.outputs and stress_data.outputs.generator and stress_data.outputs.correct and stress_data.outputs.solution then
+		table.insert(lines, "Generator Output:")
+		for _, line in ipairs(stress_data.outputs.generator.stdout) do
+			if line then
+				for _, subline in ipairs(vim.split(line, "\n", { plain = true })) do
+					if subline ~= "" then
+						table.insert(lines, "  " .. subline)
+					end
+				end
+			end
+		end
+		table.insert(lines, "")
+
+		table.insert(lines, "Correct Output:")
+		for _, line in ipairs(stress_data.outputs.correct.stdout) do
+			if line then
+				for _, subline in ipairs(vim.split(line, "\n", { plain = true })) do
+					if subline ~= "" then
+						table.insert(lines, "  " .. subline)
+					end
+				end
+			end
+		end
+		table.insert(lines, "")
+
+		table.insert(lines, "Solution Output:")
+		for _, line in ipairs(stress_data.outputs.solution.stdout) do
+			if line then
+				for _, subline in ipairs(vim.split(line, "\n", { plain = true })) do
+					if subline ~= "" then
+						table.insert(lines, "  " .. subline)
+					end
+				end
+			end
+		end
+		table.insert(lines, "")
+	end
+
+	vim.schedule(function()
+		if not self.windows.stress or not self.windows.stress.bufnr then
+			return
+		end
+		vim.api.nvim_buf_set_option(self.windows.stress.bufnr, "modifiable", true)
+		vim.api.nvim_buf_set_lines(self.windows.stress.bufnr, 0, -1, false, lines)
+		vim.api.nvim_buf_set_option(self.windows.stress.bufnr, "modifiable", false)
 	end)
 end
 

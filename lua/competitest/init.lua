@@ -18,7 +18,7 @@ function M.setup(opts)
 			let wlen = len(words)
 
 			if wlen == 1 || wlen == 2 && !ending_space
-				return "add_testcase\nedit_testcase\ndelete_testcase\nconvert\nrun\nrun_no_compile\nshow_ui\nreceive"
+				return "add_testcase\nedit_testcase\ndelete_testcase\nconvert\nrun\nrun_no_compile\nshow_ui\nreceive\nstress"
 			elseif wlen == 2 || wlen == 3 && !ending_space
 				if wlen == 2
 					let lastword = words[-1]
