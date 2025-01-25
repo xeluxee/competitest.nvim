@@ -562,141 +562,73 @@ end
 ---@param self RunnerUI
 ---@param stress_data StressData
 function RunnerUI:update_stress_view(stress_data)
+	if not self.windows.stress then
+		self:show_stress_ui()
+		return
+	end
+
+	local lines = {}
+	local status = "RUNNING"
+	if not stress_data.running then
+		if stress_data.error_messages and #stress_data.error_messages > 0 then
+			status = "ERROR: " .. stress_data.error_messages[1]
+		else
+			status = "STOPPED"
+		end
+	end
+
+	table.insert(lines, string.format("Status: %s", status))
+	table.insert(lines, string.format("Tests Passed: %d", stress_data.passed or 0))
+	table.insert(lines, string.format("Current Seed: %d", stress_data.current_seed or 0))
+	table.insert(lines, "")
+
+	-- 只在对拍失败时显示输出
+	if not stress_data.running and stress_data.error_messages and #stress_data.error_messages > 0 
+		and stress_data.outputs and stress_data.outputs.generator and stress_data.outputs.correct and stress_data.outputs.solution then
+		table.insert(lines, "Generator Output:")
+		for _, line in ipairs(stress_data.outputs.generator.stdout) do
+			if line then
+				for _, subline in ipairs(vim.split(line, "\n", { plain = true })) do
+					if subline ~= "" then
+						table.insert(lines, "  " .. subline)
+					end
+				end
+			end
+		end
+		table.insert(lines, "")
+
+		table.insert(lines, "Correct Output:")
+		for _, line in ipairs(stress_data.outputs.correct.stdout) do
+			if line then
+				for _, subline in ipairs(vim.split(line, "\n", { plain = true })) do
+					if subline ~= "" then
+						table.insert(lines, "  " .. subline)
+					end
+				end
+			end
+		end
+		table.insert(lines, "")
+
+		table.insert(lines, "Solution Output:")
+		for _, line in ipairs(stress_data.outputs.solution.stdout) do
+			if line then
+				for _, subline in ipairs(vim.split(line, "\n", { plain = true })) do
+					if subline ~= "" then
+						table.insert(lines, "  " .. subline)
+					end
+				end
+			end
+		end
+		table.insert(lines, "")
+	end
+
 	vim.schedule(function()
-		if not self.windows.stress then
-			self:show_stress_ui()
+		if not self.windows.stress or not self.windows.stress.bufnr then
 			return
 		end
-
-		-- 更新内容
-		local lines = {}
-		local runtime = stress_data and stress_data.start_time and (os.time() - stress_data.start_time) or 0
-		local status = stress_data and stress_data.running and "Running" or "Stopped"
-
-		table.insert(lines, "Status")
-		table.insert(lines, "       " .. status)
-		table.insert(lines, "")
-		table.insert(lines, "Runtime")
-		table.insert(lines, string.format("       %ds", runtime))
-		table.insert(lines, "")
-		table.insert(lines, "Tests Passed")
-		table.insert(lines, string.format("       %d", stress_data and stress_data.passed or 0))
-		table.insert(lines, "")
-
-		if stress_data and stress_data.error_messages and #stress_data.error_messages > 0 then
-			table.insert(lines, "Errors")
-			for _, msg in ipairs(stress_data.error_messages) do
-				table.insert(lines, "       " .. msg)
-			end
-			table.insert(lines, "")
-		end
-
-		if stress_data and stress_data.current_seed then
-			table.insert(lines, "Current Seed")
-			table.insert(lines, string.format("       %d", stress_data.current_seed))
-			table.insert(lines, "")
-		end
-
-		if stress_data and stress_data.outputs then
-			if stress_data.outputs.generator then
-				if stress_data.outputs.generator.exit_code ~= 0 then
-					table.insert(lines, "Generator")
-					table.insert(lines, string.format("       Exit Code: %d", stress_data.outputs.generator.exit_code))
-					table.insert(lines, string.format("       Path: %s", self.runner.stress_data and self.runner.stress_data.gen_exec or ""))
-					table.insert(lines, string.format("       Args: %s", self.runner.stress_data and table.concat(self.runner.stress_data.gen_args, " ") or ""))
-					table.insert(lines, string.format("       Working Directory: %s", self.runner.running_directory or ""))
-					if #stress_data.outputs.generator.stderr > 0 then
-						table.insert(lines, "       Stderr:")
-						for _, line in ipairs(stress_data.outputs.generator.stderr) do
-							if line and line ~= "" then
-								table.insert(lines, "              " .. line)
-							end
-						end
-					end
-					table.insert(lines, "")
-				end
-			end
-
-			if stress_data.outputs.correct then
-				if stress_data.outputs.correct.exit_code ~= 0 then
-					table.insert(lines, "Correct Program")
-					table.insert(lines, string.format("       Exit Code: %d", stress_data.outputs.correct.exit_code))
-					table.insert(lines, string.format("       Path: %s", self.runner.stress_data and self.runner.stress_data.correct_exec or ""))
-					table.insert(lines, string.format("       Args: %s", self.runner.stress_data and table.concat(self.runner.stress_data.correct_args, " ") or ""))
-					table.insert(lines, string.format("       Working Directory: %s", self.runner.running_directory or ""))
-					if #stress_data.outputs.correct.stderr > 0 then
-						table.insert(lines, "       Stderr:")
-						for _, line in ipairs(stress_data.outputs.correct.stderr) do
-							if line and line ~= "" then
-								table.insert(lines, "              " .. line)
-							end
-						end
-					end
-					table.insert(lines, "")
-				end
-			end
-
-			if stress_data.outputs.solution then
-				if stress_data.outputs.solution.exit_code ~= 0 then
-					table.insert(lines, "Solution")
-					table.insert(lines, string.format("       Exit Code: %d", stress_data.outputs.solution.exit_code))
-					table.insert(lines, string.format("       Path: %s", self.runner.stress_data and self.runner.stress_data.solution_exec or ""))
-					table.insert(lines, string.format("       Working Directory: %s", self.runner.running_directory or ""))
-					if #stress_data.outputs.solution.stderr > 0 then
-						table.insert(lines, "       Stderr:")
-						for _, line in ipairs(stress_data.outputs.solution.stderr) do
-							if line and line ~= "" then
-								table.insert(lines, "              " .. line)
-							end
-						end
-					end
-					table.insert(lines, "")
-				end
-			end
-		end
-
-		if stress_data and stress_data.failed_seeds and #stress_data.failed_seeds > 0 then
-			table.insert(lines, "Failed Seeds")
-			for _, seed in ipairs(stress_data.failed_seeds) do
-				table.insert(lines, string.format("       %d", seed))
-			end
-			table.insert(lines, "")
-
-			local last_seed = stress_data.failed_seeds[#stress_data.failed_seeds]
-			if stress_data.outputs and stress_data.outputs.generator and stress_data.outputs.correct and stress_data.outputs.solution then
-				table.insert(lines, string.format("Last Failed Test (Seed %d)", last_seed))
-				table.insert(lines, "")
-				table.insert(lines, "Generator Output")
-				for _, line in ipairs(stress_data.outputs.generator.stdout) do
-					if line and line ~= "" then
-						table.insert(lines, "       " .. line)
-					end
-				end
-				table.insert(lines, "")
-				table.insert(lines, "Correct Program Output")
-				for _, line in ipairs(stress_data.outputs.correct.stdout) do
-					if line and line ~= "" then
-						table.insert(lines, "       " .. line)
-					end
-				end
-				table.insert(lines, "")
-				table.insert(lines, "Solution Output")
-				for _, line in ipairs(stress_data.outputs.solution.stdout) do
-					if line and line ~= "" then
-						table.insert(lines, "       " .. line)
-					end
-				end
-				table.insert(lines, "")
-			end
-		end
-
-		table.insert(lines, "Key Help")
-		table.insert(lines, string.format("       %s        Pause/Continue", self.runner.config.stress_ui.mappings.pause[1]))
-		table.insert(lines, string.format("       %s        Stop and Exit", self.runner.config.stress_ui.mappings.close[1]))
-
-		if self.windows.stress and self.windows.stress.bufnr then
-			api.nvim_buf_set_lines(self.windows.stress.bufnr, 0, -1, false, lines)
-		end
+		vim.api.nvim_buf_set_option(self.windows.stress.bufnr, "modifiable", true)
+		vim.api.nvim_buf_set_lines(self.windows.stress.bufnr, 0, -1, false, lines)
+		vim.api.nvim_buf_set_option(self.windows.stress.bufnr, "modifiable", false)
 	end)
 end
 

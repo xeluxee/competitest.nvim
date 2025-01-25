@@ -504,79 +504,56 @@ end
 
 ---执行对拍进程
 ---@param self TCRunner
----@param name string 进程名称
----@param exec string 可执行文件
----@param args table 参数列表
----@param callback function 回调函数
-function TCRunner:execute_stress_process(name, exec, args, callback)
-	local stdout = luv.new_pipe(false)
-	local stderr = luv.new_pipe(false)
-	local handle
-	local timer
-
-	local function on_exit(code, signal)
-		if timer then
-			timer:stop()
-			timer:close()
-		end
-		if handle then
-			handle:close()
-		end
-		if stdout then
-			stdout:close()
-		end
-		if stderr then
-			stderr:close()
-		end
-
-		self.stress_data.outputs[name] = {
-			stdout = self.stress_data.outputs[name].stdout,
-			stderr = self.stress_data.outputs[name].stderr,
-			exit_code = code,
-			signal = signal,
-		}
-
-		callback(code == 0)
-	end
-
-	-- 初始化输出缓冲区
-	self.stress_data.outputs[name] = {
-		stdout = {},
-		stderr = {},
-	}
-
+---@param name string
+---@param exec string
+---@param args string[]
+---@param callback function
+---@param stdin string[]|nil
+local function execute_stress_process(self, name, exec, args, callback, stdin)
 	-- 检查可执行文件是否存在
 	if not utils.does_file_exist(exec) then
-		self.stress_data.outputs[name] = {
-			stdout = {},
-			stderr = {},
-			exit_code = -1,
-			signal = 0,
-		}
+		table.insert(self.stress_data.error_messages, string.format("%s executable '%s' not found", name, exec))
 		callback(false)
 		return
 	end
 
+	local stdout = luv.new_pipe(false)
+	local stderr = luv.new_pipe(false)
+	local stdin_pipe = luv.new_pipe(false)
+
+	local handle
 	handle = luv.spawn(exec, {
 		args = args,
 		cwd = self.running_directory,
-		stdio = { nil, stdout, stderr }
-	}, on_exit)
+		stdio = { stdin_pipe, stdout, stderr }
+	}, function(code)
+		if code ~= 0 then
+			table.insert(self.stress_data.error_messages, string.format("%s process exited with code %d", name, code))
+		end
+		stdout:read_stop()
+		stderr:read_stop()
+		stdout:close()
+		stderr:close()
+		stdin_pipe:close()
+		handle:close()
+		callback(code == 0)
+	end)
 
 	if not handle then
-		self.stress_data.outputs[name] = {
-			stdout = {},
-			stderr = { "无法启动进程" },
-			exit_code = -1,
-			signal = 0,
-		}
+		table.insert(self.stress_data.error_messages, string.format("Failed to start %s process", name))
 		callback(false)
 		return
 	end
 
-	luv.read_start(stdout, function(err, data)
+	self.stress_data.outputs[name] = {
+		stdout = {},
+		stderr = {},
+		exit_code = 0
+	}
+
+	stdout:read_start(function(err, data)
 		if err then
-			table.insert(self.stress_data.outputs[name].stderr, "stdout 读取错误")
+			table.insert(self.stress_data.error_messages, string.format("Failed to read %s stdout", name))
 			return
 		end
 		if data then
@@ -584,9 +561,9 @@ function TCRunner:execute_stress_process(name, exec, args, callback)
 		end
 	end)
 
-	luv.read_start(stderr, function(err, data)
+	stderr:read_start(function(err, data)
 		if err then
-			table.insert(self.stress_data.outputs[name].stderr, "stderr 读取错误")
+			table.insert(self.stress_data.error_messages, string.format("Failed to read %s stderr", name))
 			return
 		end
 		if data then
@@ -594,18 +571,28 @@ function TCRunner:execute_stress_process(name, exec, args, callback)
 		end
 	end)
 
-	timer = luv.new_timer()
-	timer:start(self.config.stress.time_limit, 0, function()
-		if handle then
-			table.insert(self.stress_data.outputs[name].stderr, "进程超时")
-			handle:kill(9)
+	-- 如果有输入数据，写入到 stdin
+	if stdin then
+		for _, line in ipairs(stdin) do
+			stdin_pipe:write(line .. "\n")
 		end
-	end)
+	end
+	stdin_pipe:shutdown()
 end
 
 ---Start stress test
 ---@param self TCRunner
 function TCRunner:start_stress_test()
+	-- 初始化对拍数据
+	self.stress_data.error_messages = {}
+	self.stress_data.outputs = {}
+	-- 只在第一次运行时初始化 passed
+	if not self.stress_data.passed then
+		self.stress_data.passed = 0
+	end
+	self.stress_data.failed_seeds = {}
+	self.stress_data.start_time = os.time()
+
 	local function generate_seed()
 		return math.random(self.config.stress.seed_range[1], self.config.stress.seed_range[2])
 	end
@@ -626,103 +613,52 @@ function TCRunner:start_stress_test()
 		end
 
 		-- Run generator
-		self:execute_stress_process("generator", self.stress_data.gen_exec, gen_args, function(success)
+		execute_stress_process(self, "generator", self.stress_data.gen_exec, gen_args, function(success)
 			if not success then
-				vim.schedule(function()
-					utils.notify("Generator failed to run")
-					utils.notify(string.format("Generator path: %s", self.stress_data.gen_exec))
-					utils.notify(string.format("Generator arguments: %s", table.concat(gen_args, " ")))
-					utils.notify(string.format("Working directory: %s", self.running_directory))
-					if #self.stress_data.outputs.generator.stderr > 0 then
-						for _, line in ipairs(self.stress_data.outputs.generator.stderr) do
-							if line and line ~= "" then
-								utils.notify(string.format("Generator error output: %s", line))
-							end
-						end
-					end
-				end)
+				table.insert(self.stress_data.error_messages, "Generator failed to run")
+				self.stress_data.running = false
+				self:update_stress_ui()
 				return
 			end
 
-			-- Run correct program
-			self:execute_stress_process("correct", self.stress_data.correct_exec, self.stress_data.correct_args, function(success)
-				if not success then
-					vim.schedule(function()
-						utils.notify("Correct program failed to run")
-						utils.notify(string.format("Correct program path: %s", self.stress_data.correct_exec))
-						utils.notify(string.format("Correct program arguments: %s", table.concat(self.stress_data.correct_args, " ")))
-						utils.notify(string.format("Working directory: %s", self.running_directory))
-						if #self.stress_data.outputs.correct.stderr > 0 then
-							for _, line in ipairs(self.stress_data.outputs.correct.stderr) do
-								if line and line ~= "" then
-									utils.notify(string.format("Correct program error output: %s", line))
-								end
-							end
+			-- Get generator output as input data
+			local input_data = {}
+			for _, line in ipairs(self.stress_data.outputs.generator.stdout) do
+				if line then
+					for _, subline in ipairs(vim.split(line, "\n", { plain = true })) do
+						if subline ~= "" then
+							table.insert(input_data, subline)
 						end
-					end)
+					end
+				end
+			end
+
+			-- Run correct program
+			execute_stress_process(self, "correct", self.stress_data.correct_exec, self.stress_data.correct_args, function(success)
+				if not success then
+					table.insert(self.stress_data.error_messages, "Correct program failed to run")
+					self.stress_data.running = false
+					self:update_stress_ui()
 					return
 				end
 
 				-- Run program under test
-				self:execute_stress_process("solution", self.stress_data.solution_exec, self.stress_data.solution_args, function(success)
+				execute_stress_process(self, "solution", self.stress_data.solution_exec, self.stress_data.solution_args, function(success)
 					if not success then
-						vim.schedule(function()
-							local error_messages = {
-								"Program under test failed to run",
-								string.format("Program under test path: %s", self.stress_data.solution_exec),
-								string.format("Program under test arguments: %s", table.concat(self.stress_data.solution_args, " ")),
-								string.format("Working directory: %s", self.running_directory),
-							}
-							if #self.stress_data.outputs.solution.stderr > 0 then
-								for _, line in ipairs(self.stress_data.outputs.solution.stderr) do
-									if line and line ~= "" then
-										table.insert(error_messages, string.format("Error output: %s", line))
-									end
-								end
-							end
-							for _, msg in ipairs(error_messages) do
-								utils.notify(msg)
-							end
-						end)
+						table.insert(self.stress_data.error_messages, "Solution program failed to run")
+						self.stress_data.running = false
+						self:update_stress_ui()
 						return
 					end
 
 					-- Compare outputs
-					local correct_output = table.concat(self.stress_data.outputs.correct.stdout or {}, "\n")
-					local solution_output = table.concat(self.stress_data.outputs.solution.stdout or {}, "\n")
+					local correct_output = table.concat(self.stress_data.outputs.correct.stdout, "\n")
+					local solution_output = table.concat(self.stress_data.outputs.solution.stdout, "\n")
 
 					if correct_output ~= solution_output then
 						table.insert(self.stress_data.failed_seeds, seed)
+						table.insert(self.stress_data.error_messages, string.format("Test failed with seed %d", seed))
 						self.stress_data.running = false
-						vim.schedule(function()
-							local error_messages = {
-								string.format("Stress test failed: seed %d", seed),
-								"",
-								"Generator output:",
-							}
-							for _, line in ipairs(self.stress_data.outputs.generator.stdout) do
-								if line and line ~= "" then
-									table.insert(error_messages, string.format("  %s", line))
-								end
-							end
-							table.insert(error_messages, "")
-							table.insert(error_messages, "Correct program output:")
-							for _, line in ipairs(self.stress_data.outputs.correct.stdout) do
-								if line and line ~= "" then
-									table.insert(error_messages, string.format("  %s", line))
-								end
-							end
-							table.insert(error_messages, "")
-							table.insert(error_messages, "Solution output:")
-							for _, line in ipairs(self.stress_data.outputs.solution.stdout) do
-								if line and line ~= "" then
-									table.insert(error_messages, string.format("  %s", line))
-								end
-							end
-							for _, msg in ipairs(error_messages) do
-								utils.notify(msg)
-							end
-						end)
 						self:update_stress_ui()
 					else
 						self.stress_data.passed = self.stress_data.passed + 1
@@ -731,8 +667,8 @@ function TCRunner:start_stress_test()
 							vim.defer_fn(run_stress_iteration, 0)
 						end
 					end
-				end)
-			end)
+				end, input_data)
+			end, input_data)
 		end)
 	end
 
