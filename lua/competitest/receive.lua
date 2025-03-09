@@ -49,33 +49,17 @@ function M.eval_receive_modifiers(str, task, file_extension, remove_illegal_char
 	return utils.format_string_modifiers(str, receive_modifiers)
 end
 
----Wait for competitive companion to send tasks data
+---Wait for competitive companion to send tasks data persistently
 ---@param port integer: competitive companion port to listen on
 ---@param single_task boolean: whether to parse a single task or all tasks
----@param notify string | nil: if not nil notify user when receiving data. It specifies what content is received: can be "testcases", "problem" or "contest"
+---@param notify string | nil: if not nil notify user when receiving data (ignored now)
 ---@param callback function: function called after data is received, accepting list of tasks as argument
 function M.receive(port, single_task, notify, callback)
 	local tasks = {} -- table with tasks data
-	local server, client, timer
-
-	---Stop listening to competitive companion port
-	local function stop_receiving()
-		if client and not client:is_closing() then
-			client:shutdown()
-			client:close()
-		end
-		if server and not server:is_closing() then
-			server:shutdown()
-			server:close()
-		end
-		if timer and not timer:is_closing() then
-			timer:stop()
-			timer:close()
-		end
-	end
-
+	local server, client
 	local message = {} -- received string
-	local tasks_number = single_task and 1 or nil -- if nil download all tasks
+	local tasks_number = single_task and 1 or nil -- if nil, download all tasks
+
 	server = luv.new_tcp()
 	server:bind("127.0.0.1", port)
 	server:listen(128, function(err)
@@ -87,32 +71,41 @@ function M.receive(port, single_task, notify, callback)
 			if chunk then
 				table.insert(message, chunk)
 			else
-				message = string.match(table.concat(message), "^.+\r\n(.+)$") -- last line, text after last \r\n
+				message = string.match(table.concat(message), "^.+\r\n(.+)$") -- text after last \r\n
 				message = vim.json.decode(message)
 				table.insert(tasks, message)
 				tasks_number = tasks_number or message.batch.size
 				tasks_number = tasks_number - 1
 				if tasks_number == 0 then
-					stop_receiving()
+					-- Close current connection and server, then restart listening persistently
+					if client and not client:is_closing() then
+						client:shutdown()
+						client:close()
+					end
+					if server and not server:is_closing() then
+						server:shutdown()
+						server:close()
+					end
 					vim.schedule(function()
-						if notify then
-							utils.notify(notify .. " received successfully!", "INFO")
-						end
+						-- Disabled notification message here:
+						-- utils.notify(notify .. " received successfully!", "INFO")
 						callback(tasks)
+						-- Restart persistent listening immediately
+						M.receive(port, single_task, notify, callback)
 					end)
+					message = {}
+					return
 				end
 				message = {}
 			end
 		end)
 	end)
 
-	-- if after 100 seconds nothing happened stop listening
-	timer = luv.new_timer()
-	timer:start(100000, 0, stop_receiving)
-
-	if notify then
-		utils.notify("ready to receive " .. notify .. ". Press the green plus button in your browser.", "INFO")
-	end
+	-- Removed timer for persistent listening
+	-- Disabled notification message on listener start:
+	-- if notify then
+	-- 	utils.notify("Persistent receiver is ready on port " .. port .. ". Awaiting " .. notify .. " from Competitive Companion.", "INFO")
+	-- end
 end
 
 ---Utility function to store received testcases
@@ -129,7 +122,7 @@ function M.store_testcases(bufnr, tclist, use_single_file, replace)
 		end
 		if choice == 2 then -- user chose "Replace"
 			if not use_single_file then
-				for tcnum, _ in pairs(tctbl) do -- delete existing files
+				for tcnum, _ in pairs(tctbl) do
 					testcases.io_files.buf_write_pair(bufnr, tcnum, nil, nil)
 				end
 			end
@@ -161,21 +154,21 @@ function M.store_problem_config(filepath, confirm_overwriting, task, cfg)
 		local choice = vim.fn.confirm('Do you want to overwrite "' .. filepath .. '"?', "Yes\nNo")
 		if choice == 0 or choice == 2 then
 			return
-		end -- user pressed <esc> or chose "No"
+		end
 	end
 
 	local file_extension = vim.fn.fnamemodify(filepath, ":e")
 	local template_file -- template file absolute path
-	if type(cfg.template_file) == "string" then -- string with CompetiTest file-format modifiers
+	if type(cfg.template_file) == "string" then
 		template_file = utils.eval_string(filepath, cfg.template_file)
-	elseif type(cfg.template_file) == "table" then -- table with paths to template files
+	elseif type(cfg.template_file) == "table" then
 		template_file = cfg.template_file[file_extension]
 	end
 
 	if template_file then
-		template_file = string.gsub(template_file, "^%~", vim.loop.os_homedir()) -- expand tilde into home directory
+		template_file = string.gsub(template_file, "^%~", vim.loop.os_homedir())
 		if not utils.does_file_exist(template_file) then
-			if type(cfg.template_file) == "table" then -- notify file absence when path is explicitly set
+			if type(cfg.template_file) == "table" then
 				utils.notify('template file "' .. template_file .. "\" doesn't exist.", "WARN")
 			end
 			template_file = nil
@@ -183,7 +176,6 @@ function M.store_problem_config(filepath, confirm_overwriting, task, cfg)
 	end
 
 	local file_directory = vim.fn.fnamemodify(filepath, ":h")
-	-- if template file exists then template_file is a string
 	if template_file then
 		if cfg.evaluate_template_modifiers then
 			local str = utils.load_file_as_string(template_file)
@@ -199,7 +191,6 @@ function M.store_problem_config(filepath, confirm_overwriting, task, cfg)
 
 	local tctbl = {}
 	local tcindex = 0
-	-- convert testcases list into a 0-indexed testcases table
 	for _, tc in ipairs(task.tests) do
 		tctbl[tcindex] = tc
 		tcindex = tcindex + 1
@@ -215,3 +206,4 @@ function M.store_problem_config(filepath, confirm_overwriting, task, cfg)
 end
 
 return M
+
