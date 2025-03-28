@@ -136,6 +136,8 @@ function TCRunner:run_testcases(tctbl, compile)
 		local function compilation_callback()
 			if self.tcdata[1].exit_code == 0 then
 				run_first_testcases()
+            else
+                print("compilazione errata")
 			end
 		end
 
