@@ -360,6 +360,7 @@ function RunnerUI:update_ui(compilation_error)
         
         if compilation_error then
 			self:show_viewer_popup("se")
+            return
         end
 
 		-- update windows content if not already updated
