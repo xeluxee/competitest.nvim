@@ -358,7 +358,7 @@ function RunnerUI:update_ui(compilation_error)
 			return
 		end
         
-        if compilation_error
+        if compilation_error then
 			self:show_viewer_popup("se")
         end
 
