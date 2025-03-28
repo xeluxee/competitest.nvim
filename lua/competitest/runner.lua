@@ -339,10 +339,7 @@ function TCRunner:update_ui(update_windows, compilation_error)
 			self.ui.update_windows = true
 		end
 		self.ui.update_details = true
-        if compilation_error then
-            print("ciao")
-        end
-		self.ui:update_ui()
+		self.ui:update_ui(compilation_error)
 	end
 end
 

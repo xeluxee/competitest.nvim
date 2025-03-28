@@ -351,11 +351,16 @@ local function adjust_string(len, str, fchar)
 end
 
 ---Update Runner UI
-function RunnerUI:update_ui()
+---@param compilation_error boolean | nil: whether to pass to the compialtion error view
+function RunnerUI:update_ui(compilation_error)
 	vim.schedule(function()
 		if not self.ui_visible or next(self.runner.tcdata) == nil then
 			return
 		end
+        
+        if compilation_error
+			self:show_viewer_popup("se")
+        end
 
 		-- update windows content if not already updated
 		if self.update_windows then
