@@ -129,6 +129,10 @@ function TCRunner:run_testcases(tctbl, compile)
 		end
 	end
 
+    local function toggle_compilation_error_ui()
+        print("compialtion error")
+    end
+
 	if not self.compile then
 		run_first_testcases()
 	else
@@ -137,7 +141,7 @@ function TCRunner:run_testcases(tctbl, compile)
 			if self.tcdata[1].exit_code == 0 then
 				run_first_testcases()
             else
-                print("compilazione errata")
+                toggle_compilation_error_ui()
 			end
 		end
 
