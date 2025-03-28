@@ -129,10 +129,6 @@ function TCRunner:run_testcases(tctbl, compile)
 		end
 	end
 
-    local function toggle_compilation_error_ui()
-        print("compialtion error")
-    end
-
 	if not self.compile then
 		run_first_testcases()
 	else
@@ -140,8 +136,6 @@ function TCRunner:run_testcases(tctbl, compile)
 		local function compilation_callback()
 			if self.tcdata[1].exit_code == 0 then
 				run_first_testcases()
-            else
-                toggle_compilation_error_ui()
 			end
 		end
 
@@ -202,7 +196,7 @@ function TCRunner:execute_testcase(tcindex, exec, args, dir, callback)
 			tc.timer:close()
 		end
 
-		self:update_ui(true)
+		self:update_ui(true, exit_signal ~= 0 and tcindex == 1)
 		if callback then
 			callback()
 		end
@@ -338,12 +332,16 @@ end
 
 ---Update Runner UI content
 ---@param update_windows boolean | nil: whether to update all the windows or only details windows
-function TCRunner:update_ui(update_windows)
+---@param compilation_error boolean | nil: whether to pass to the compialtion error view
+function TCRunner:update_ui(update_windows, compilation_error)
 	if self.ui then
 		if update_windows then -- avoid direct assignment to satisfy unprocessed previous update_windows requests
 			self.ui.update_windows = true
 		end
 		self.ui.update_details = true
+        if compilation_error then
+            print("ciao")
+        end
 		self.ui:update_ui()
 	end
 end
