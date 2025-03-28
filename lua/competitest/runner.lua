@@ -195,8 +195,8 @@ function TCRunner:execute_testcase(tcindex, exec, args, dir, callback)
 			tc.timer:stop()
 			tc.timer:close()
 		end
-
-		self:update_ui(true, exit_signal ~= 0 and tcindex == 1)
+        
+		self:update_ui(true, tc.status ~= "DONE" and tcindex == 1)
 		if callback then
 			callback()
 		end

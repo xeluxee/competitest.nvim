@@ -357,7 +357,7 @@ function RunnerUI:update_ui(compilation_error)
 		if not self.ui_visible or next(self.runner.tcdata) == nil then
 			return
 		end
-        
+
         if compilation_error then
 			self:show_viewer_popup("se")
             return
