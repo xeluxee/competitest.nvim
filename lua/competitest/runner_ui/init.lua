@@ -311,7 +311,7 @@ function RunnerUI:show_viewer_popup(window_name)
 				width = self.runner.config.runner_ui.viewer.width,
 				height = self.runner.config.runner_ui.viewer.height,
 			},
-			position = "50%",
+			position = "100%",
 			win_options = {
 				number = self.runner.config.runner_ui.viewer.show_nu,
 				relativenumber = self.runner.config.runner_ui.viewer.show_rnu,
@@ -359,6 +359,7 @@ function RunnerUI:update_ui(compilation_error)
 		end
         
         if compilation_error then
+            self:hide_ui()
 			self:show_viewer_popup("se")
         end
 
