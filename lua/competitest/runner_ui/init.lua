@@ -308,8 +308,8 @@ function RunnerUI:show_viewer_popup(window_name)
 			},
 			relative = "editor",
 			size = {
-				width = math.floor(vim_width * self.runner.config.runner_ui.viewer.width + 1),
-				height = math.floor(vim_height * self.runner.config.runner_ui.viewer.height + 1),
+				width = math.floor(vim_width),
+				height = math.floor(vim_height),
 			},
 			position = "50%",
 			win_options = {
