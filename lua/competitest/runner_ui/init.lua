@@ -308,8 +308,8 @@ function RunnerUI:show_viewer_popup(window_name)
 			},
 			relative = "editor",
 			size = {
-				width = math.floor(vim_width * self.runner.config.runner_ui.viewer.width + 0.5),
-				height = math.floor(vim_height * self.runner.config.runner_ui.viewer.height + 0.5),
+				width = math.floor(vim_width * self.runner.config.popup_ui.total_width + 0.5),
+				height = math.floor(vim_height * self.runner.config.popup_ui.total_height + 0.5),
 			},
 			position = "50%",
 			win_options = {
@@ -351,11 +351,17 @@ local function adjust_string(len, str, fchar)
 end
 
 ---Update Runner UI
-function RunnerUI:update_ui()
+---@param compilation_error boolean | nil: whether to pass to the compialtion error view
+function RunnerUI:update_ui(compilation_error)
 	vim.schedule(function()
 		if not self.ui_visible or next(self.runner.tcdata) == nil then
 			return
 		end
+
+        if compilation_error then
+			self:show_viewer_popup("se")
+            return
+        end
 
 		-- update windows content if not already updated
 		if self.update_windows then

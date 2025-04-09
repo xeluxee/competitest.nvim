@@ -95,7 +95,7 @@ function M.init_ui(windows, config)
 	windows.so = nui_popup(popup_settings)
 
 	-- expected output popup
-	popup_settings.border.text.top = " Expected Output "
+	popup_settings.border.text.top = " Expected Output"
 	popup_settings.size = sizes["eo"]
 	popup_settings.position = positions["eo"]
 	windows.eo = nui_popup(popup_settings)
