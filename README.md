@@ -143,9 +143,12 @@ Of course all these keybindings can be customized: see `runner_ui` ➤ `mappings
 **NOTE:** to get this feature working you need to install [competitive-companion](https://github.com/jmerle/competitive-companion) extension in your browser.
 
 Thanks to its integration with [competitive-companion](https://github.com/jmerle/competitive-companion), CompetiTest can download contents from competitive programming platforms:
-- Download only testcases with `:CompetiTest receive testcases`
-- Download a problem with `:CompetiTest receive problem` (source file is automatically created along with testcases)
-- Download an entire contest with `:CompetiTest receive contest` (make sure to be on the homepage of the contest, not of a single problem)
+- Launch `:CompetiTest receive testcases` to only receive testcases *once*
+- Launch `:CompetiTest receive problem` to receive a problem *once* (source file is automatically created along with testcases)
+- Launch `:CompetiTest receive contest` to receive an entire contest *once* (make sure to be on the homepage of the contest, not of a single problem)
+- Launch `:CompetiTest receive persistently` to keep receiving testcases, problems and contests *persistently* (also see the option `start_receiving_persistently_on_setup`)
+- Launch `:CompetiTest receive status` to show current receive status
+- Launch `:CompetiTest receive stop` to stop receiving
 
 After launching one of these commands click on the green plus button in your browser to start downloading.\
 For further customization see receive options in [configuration](#configuration).
@@ -313,6 +316,7 @@ require('competitest').setup {
 
 	companion_port = 27121,
 	receive_print_message = true,
+	start_receiving_persistently_on_setup = false,
 	template_file = false,
 	evaluate_template_modifiers = false,
 	date_format = "%c",
@@ -414,6 +418,7 @@ require('competitest').setup {
 - `testcases_output_file_format`: string representing how testcases output files should be named (see [file-format modifiers](#file-format-modifiers))
 - `companion_port`: competitive companion port number
 - `receive_print_message`: if true notify user that plugin is ready to receive testcases, problems and contests or that they have just been received
+- `start_receiving_persistently_on_setup`: if true start receiving testcases, problems and contests persistently, soon after calling `setup()`
 - `template_file`: templates to use when creating source files for received problems or contests. Can be one of the following:
 	- `false`: do not use templates
 	- string with [file-format modifiers](#file-format-modifiers): useful when templates for different file types have a regular file naming

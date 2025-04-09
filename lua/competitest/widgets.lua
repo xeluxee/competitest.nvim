@@ -246,23 +246,26 @@ local input = {}
 ---@param default_text string
 ---@param border_style string
 ---@param callback_only boolean
----@param callback function
-function M.input(title, default_text, border_style, callback_only, callback)
+---@param callback_on_submit fun(text: string)
+---@param callback_on_close fun()?
+function M.input(title, default_text, border_style, callback_only, callback_on_submit, callback_on_close)
 	if title == nil then -- resize UI
 		if not input.ui_visible then
 			return
 		end
+		input.skip_on_close = true
 		input.default_text = api.nvim_buf_get_lines(input.popup.bufnr, 0, -1, false)[1]
 		input.popup:unmount()
 	else
 		if callback_only then
-			callback(default_text)
+			callback_on_submit(default_text)
 			return
 		end
 		input.title = title
 		input.default_text = default_text
 		input.border_style = border_style
-		input.callback = callback
+		input.callback_on_submit = callback_on_submit
+		input.callback_on_close = callback_on_close
 	end
 
 	local nui_input = require("nui.input")
@@ -279,11 +282,18 @@ function M.input(title, default_text, border_style, callback_only, callback)
 		},
 	}, {
 		on_close = function()
+			if input.skip_on_close then
+				input.skip_on_close = false
+				return
+			end
 			input.ui_visible = false
+			if input.callback_on_close then
+				input.callback_on_close()
+			end
 		end,
 		on_submit = function(value)
 			input.ui_visible = false
-			input.callback(value)
+			input.callback_on_submit(value)
 		end,
 	})
 

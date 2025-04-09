@@ -1,16 +1,312 @@
-local luv = vim.loop
-local testcases = require("competitest.testcases")
+local luv = vim.uv and vim.uv or vim.loop
 local utils = require("competitest.utils")
 local M = {}
+local storage_utils = {}
+
+---competitive-companion task format
+---@class (exact) CCTask
+---@field name string
+---@field group string
+---@field url string
+---@field interactive boolean?
+---@field memoryLimit number
+---@field timeLimit number
+---@field tests { input: string, output: string }[]
+---@field testType "single" | "multiNumber"
+---@field input { type: "stdin" | "file" | "regex", fileName: string?, pattern: string? }
+---@field output { type: "stdout" | "file", fileName: string? }
+---@field languages { java: { mainClass: string, taskClass: string }, [string]: any }
+---@field batch { id: string, size: integer }
+
+---------------- RECEIVE UTILITIES ----------------
+
+---Receive tasks from competitive-companion
+---@class (exact) Receiver
+---@field private __index self
+---@field private server uv.uv_tcp_t
+local Receiver = {}
+Receiver.__index = Receiver
+
+---Create a new Receiver and start listening to `address:port`
+---@param address string address to bind server socket to
+---@param port integer port to bind server socket to
+---@param callback fun(task: CCTask) called every time EOF is reached from an incoming stream, accepting the received task as argument
+---@return Receiver | string # a new Receiver object, or string describing error on failure
+function Receiver:new(address, port, callback)
+	local server = luv.new_tcp()
+	if not server then
+		return "server TCP socket creation failed"
+	end
+	local bind_success, bind_error = server:bind(address, port)
+	if not bind_success then
+		return string.format("cannot bind receiver to %s:%d%s", address, port, bind_error and (": " .. bind_error) or "")
+	end
+	local listen_success, listen_error = server:listen(128, function(err)
+		assert(not err, err)
+		local client = luv.new_tcp()
+		assert(client, "CompetiTest.nvim: Receiver:new, server:listen: client TCP socket creation failed")
+		server:accept(client)
+		local message = {} -- received string
+		client:read_start(function(error, chunk)
+			assert(not error, error)
+			if chunk then
+				table.insert(message, chunk)
+			else
+				client:read_stop()
+				client:close()
+				local content = string.match(table.concat(message), "^.+\r\n(.+)$") -- last line, text after last \r\n
+				local task = vim.json.decode(content)
+				callback(task)
+			end
+		end)
+	end)
+	if not listen_success then
+		return string.format("cannot listen or bind receiver to %s:%d%s", address, port, listen_error and (": " .. listen_error) or "")
+	end
+	local this = {
+		server = server,
+	}
+	setmetatable(this, self)
+	return this
+end
+
+---Close receiver and stop listening
+function Receiver:close()
+	if self.server:is_active() and not self.server:is_closing() then
+		self.server:close()
+	end
+end
+
+---@alias batch_id string
+
+---Collect tasks received from competitive-companion and send them to a callback every time a batch is fully received
+---@class (exact) TasksCollector
+---@field private __index self
+---@field private batches { [batch_id]: { size: integer, tasks: CCTask[] } }
+---@field private callback fun(tasks: CCTask[])
+local TasksCollector = {}
+TasksCollector.__index = TasksCollector
+
+---Create a new tasks collector
+---@param callback fun(tasks: CCTask[]) called every time a batch is fully received, accepting a batch of tasks as argument
+---@return TasksCollector
+function TasksCollector:new(callback)
+	local this = {
+		batches = {},
+		callback = callback,
+	}
+	setmetatable(this, self)
+	return this
+end
+
+---Insert a competitive-companion task into collector
+---@param task CCTask
+function TasksCollector:insert(task)
+	if not self.batches[task.batch.id] then
+		self.batches[task.batch.id] = { size = task.batch.size, tasks = {} }
+	end
+	local b = self.batches[task.batch.id]
+	table.insert(b.tasks, task)
+	if b.size == #b.tasks then -- batch fully received
+		local tasks = b.tasks
+		self.batches[task.batch.id] = nil
+		self.callback(tasks)
+	end
+end
+
+---Process batches of tasks serially
+---@class (exact) BatchesSerialProcessor
+---@field private __index self
+---@field private batches CCTask[][]
+---@field private callback fun(tasks: CCTask[], finished: fun())
+---@field private callback_busy boolean
+---@field private stopped boolean
+local BatchesSerialProcessor = {}
+BatchesSerialProcessor.__index = BatchesSerialProcessor
+
+---Create a new batches serial processor
+---@param callback fun(tasks: CCTask[], finished: fun()) serially called for every enqueued batch, i.e. no two callbacks run at the same time; it accepts two arguments: batch of tasks and a function that must be called when callback finishes to unlock the batches serial processor
+---@return BatchesSerialProcessor
+function BatchesSerialProcessor:new(callback)
+	local this = {
+		batches = {},
+		callback = callback,
+		callback_busy = false,
+		stopped = false,
+	}
+	setmetatable(this, self)
+	return this
+end
+
+---Enqueue a batch of tasks for processing
+---@param batch CCTask[]
+function BatchesSerialProcessor:enqueue(batch)
+	table.insert(self.batches, batch)
+	self:process()
+end
+
+---@private
+---Process the first enqueued batch
+function BatchesSerialProcessor:process()
+	if #self.batches == 0 or self.callback_busy or self.stopped then
+		return
+	end
+	self.callback_busy = true
+	local batch = self.batches[1]
+	table.remove(self.batches, 1)
+	self.callback(
+		batch,
+		vim.schedule_wrap(function()
+			self.callback_busy = false
+			self:process()
+		end)
+	)
+end
+
+---Stop processing batches, except for the currently running callback, if any
+function BatchesSerialProcessor:stop()
+	self.stopped = true
+end
+
+---------------- RECEIVE METHODS ----------------
+
+---@alias receive_mode "testcases" | "problem" | "contest" | "persistently"
+
+---@class (exact) ReceiveStatus
+---@field mode receive_mode
+---@field companion_port integer
+---@field receiver Receiver
+---@field tasks_collector TasksCollector
+---@field batches_serial_processor BatchesSerialProcessor
+
+---@type ReceiveStatus?
+local rt = nil
+
+---Stop receiving, listening to competitive-companion and processing received tasks
+function M.stop_receiving()
+	if rt then
+		rt.receiver:close()
+		rt.batches_serial_processor:stop()
+		rt = nil
+	end
+end
+
+---Show current receive status trough a notification
+function M.show_status()
+	local msg
+	if not rt then
+		msg = "receiving not enabled."
+	else
+		msg = "receiving " .. rt.mode .. ", listening on port " .. rt.companion_port .. "."
+	end
+	utils.notify(msg, "INFO")
+end
+
+---Start receiving tasks from competitive-companion
+---@param mode receive_mode
+---@param companion_port integer competitive-companion port to listen to
+---@param notify_on_start boolean if true notify user when receiving starts correctly
+---@param notify_on_receive boolean if true notify user when data is received
+---@param bufnr integer? buffer number, only required when mode = "testcases"
+---@param cfg table current CompetiTest configuration
+---@return string? # nil, or a string describing error on failure
+function M.start_receiving(mode, companion_port, notify_on_start, notify_on_receive, bufnr, cfg)
+	if rt then
+		return "receiving already enabled, stop it if you want to change receive mode"
+	end
+	---@type fun(tasks: CCTask[], finished: fun())
+	local bsp_callback
+	if mode == "testcases" then
+		if not bufnr then
+			return "bufnr required when receiving testcases"
+		end
+		bsp_callback = function(tasks, _)
+			M.stop_receiving()
+			if notify_on_receive then
+				utils.notify("testcases received successfully!", "INFO")
+			end
+			storage_utils.store_testcases(bufnr, tasks[1].tests, cfg.testcases_use_single_file, cfg.replace_received_testcases, nil)
+		end
+	elseif mode == "problem" then
+		bsp_callback = function(tasks, _)
+			M.stop_receiving()
+			if notify_on_receive then
+				utils.notify("problem received successfully!", "INFO")
+			end
+			storage_utils.store_single_problem(tasks[1], cfg, nil)
+		end
+	elseif mode == "contest" then
+		bsp_callback = function(tasks, _)
+			M.stop_receiving()
+			if notify_on_receive then
+				utils.notify("contest (" .. #tasks .. " tasks) received successfully!", "INFO")
+			end
+			storage_utils.store_contest(tasks, cfg, nil)
+		end
+	elseif mode == "persistently" then
+		bsp_callback = function(tasks, finished)
+			if notify_on_receive then
+				if #tasks > 1 then
+					utils.notify("contest (" .. #tasks .. " tasks) received successfully!", "INFO")
+				else
+					utils.notify("one task received successfully!", "INFO")
+				end
+			end
+			if #tasks > 1 then
+				storage_utils.store_contest(tasks, cfg, finished)
+			else
+				local choice = vim.fn.confirm(
+					"One task received (" .. tasks[1].name .. ").\nDo you want to store its testcases only or the full problem?",
+					"Testcases\nProblem\nCancel"
+				)
+				if choice == 1 then -- user chose "Testcases"
+					storage_utils.store_testcases(
+						vim.api.nvim_get_current_buf(),
+						tasks[1].tests,
+						cfg.testcases_use_single_file,
+						cfg.replace_received_testcases,
+						finished
+					)
+				elseif choice == 2 then -- user chose "Problem"
+					storage_utils.store_single_problem(tasks[1], cfg, finished)
+				else -- user pressed <esc> or chose "Cancel"
+					finished()
+				end
+			end
+		end
+	end
+	local batches_serial_processor = BatchesSerialProcessor:new(vim.schedule_wrap(bsp_callback))
+	local tasks_collector = TasksCollector:new(function(tasks)
+		batches_serial_processor:enqueue(tasks)
+	end)
+	local receiver_or_error = Receiver:new("127.0.0.1", companion_port, function(task)
+		tasks_collector:insert(task)
+	end)
+	if type(receiver_or_error) == "string" then
+		return receiver_or_error
+	end
+	rt = {
+		mode = mode,
+		companion_port = companion_port,
+		receiver = receiver_or_error,
+		tasks_collector = tasks_collector,
+		batches_serial_processor = batches_serial_processor,
+	}
+	if notify_on_start then
+		utils.notify("ready to receive " .. mode .. ". Press the green plus button in your browser.", "INFO")
+	end
+end
+
+---------------- STORAGE UTILITIES ----------------
 
 ---Convert a string with CompetiTest receive modifiers into a formatted string
----@param str string: the string to evaluate
----@param task table: table with received task data
+---@param str string the string to evaluate
+---@param task CCTask received task
 ---@param file_extension string
----@param remove_illegal_characters boolean: whether to remove windows illegal characters from modifiers or not
----@param date_format string | nil: string used to format date
----@return string | nil: the converted string, or nil on failure
-function M.eval_receive_modifiers(str, task, file_extension, remove_illegal_characters, date_format)
+---@param remove_illegal_characters boolean whether to remove windows illegal characters from modifiers or not
+---@param date_format string? string used to format date
+---@return string? # the converted string, or nil on failure
+function storage_utils.eval_receive_modifiers(str, task, file_extension, remove_illegal_characters, date_format)
 	local judge, contest
 	local hyphen = string.find(task.group, " - ", 1, true)
 	if not hyphen then
@@ -49,78 +345,27 @@ function M.eval_receive_modifiers(str, task, file_extension, remove_illegal_char
 	return utils.format_string_modifiers(str, receive_modifiers)
 end
 
----Wait for competitive companion to send tasks data
----@param port integer: competitive companion port to listen on
----@param single_task boolean: whether to parse a single task or all tasks
----@param notify string | nil: if not nil notify user when receiving data. It specifies what content is received: can be "testcases", "problem" or "contest"
----@param callback function: function called after data is received, accepting list of tasks as argument
-function M.receive(port, single_task, notify, callback)
-	local tasks = {} -- table with tasks data
-	local server, client, timer
-
-	---Stop listening to competitive companion port
-	local function stop_receiving()
-		if client and not client:is_closing() then
-			client:shutdown()
-			client:close()
-		end
-		if server and not server:is_closing() then
-			server:shutdown()
-			server:close()
-		end
-		if timer and not timer:is_closing() then
-			timer:stop()
-			timer:close()
-		end
-	end
-
-	local message = {} -- received string
-	local tasks_number = single_task and 1 or nil -- if nil download all tasks
-	server = luv.new_tcp()
-	server:bind("127.0.0.1", port)
-	server:listen(128, function(err)
-		assert(not err, err)
-		client = luv.new_tcp()
-		server:accept(client)
-		client:read_start(function(error, chunk)
-			assert(not error, error)
-			if chunk then
-				table.insert(message, chunk)
-			else
-				message = string.match(table.concat(message), "^.+\r\n(.+)$") -- last line, text after last \r\n
-				message = vim.json.decode(message)
-				table.insert(tasks, message)
-				tasks_number = tasks_number or message.batch.size
-				tasks_number = tasks_number - 1
-				if tasks_number == 0 then
-					stop_receiving()
-					vim.schedule(function()
-						if notify then
-							utils.notify(notify .. " received successfully!", "INFO")
-						end
-						callback(tasks)
-					end)
-				end
-				message = {}
-			end
-		end)
-	end)
-
-	-- if after 100 seconds nothing happened stop listening
-	timer = luv.new_timer()
-	timer:start(100000, 0, stop_receiving)
-
-	if notify then
-		utils.notify("ready to receive " .. notify .. ". Press the green plus button in your browser.", "INFO")
+---Get path for received problems or contests
+---@param path string | fun(task: CCTask, file_extension: string): string see `received_problems_path`, `received_contests_directory` and `received_contests_problems_path`
+---@param task CCTask received task
+---@param file_extension string configured file extension
+---@return string? # evaluated path, or nil on failure
+function storage_utils.eval_path(path, task, file_extension)
+	if type(path) == "string" then
+		return storage_utils.eval_receive_modifiers(path, task, file_extension, true)
+	elseif type(path) == "function" then
+		return path(task, file_extension)
 	end
 end
 
 ---Utility function to store received testcases
----@param bufnr integer: buffer number
----@param tclist table: table containing received testcases
----@param use_single_file boolean: whether to store testcases in a single file or not
----@param replace boolean: whether to replace existing testcases with received ones or to ask user what to do
-function M.store_testcases(bufnr, tclist, use_single_file, replace)
+---@param bufnr integer buffer number
+---@param tclist { input: string, output: string }[] received testcases
+---@param use_single_file boolean whether to store testcases in a single file or not
+---@param replace boolean whether to replace existing testcases with received ones or to ask user what to do
+---@param finished fun()? a function that must be called when procedure finishes
+function storage_utils.store_testcases(bufnr, tclist, use_single_file, replace, finished)
+	local testcases = require("competitest.testcases")
 	local tctbl = testcases.buf_get_testcases(bufnr)
 	if next(tctbl) ~= nil then
 		local choice = 2
@@ -149,19 +394,22 @@ function M.store_testcases(bufnr, tclist, use_single_file, replace)
 	end
 
 	testcases.buf_write_testcases(bufnr, tctbl, use_single_file)
+	if finished then
+		finished()
+	end
 end
 
----Utility function to store received problem following configuration
----@param filepath string: source file absolute path
----@param confirm_overwriting boolean: whether to ask user to overwrite an already existing file or not
----@param task table: table with all task details
----@param cfg table: table containing CompetiTest configuration
-function M.store_problem_config(filepath, confirm_overwriting, task, cfg)
+---Utility function to store received task and its testcases following configuration
+---@param filepath string source file absolute path
+---@param confirm_overwriting boolean whether to ask user to overwrite an already existing file or not
+---@param task CCTask received task
+---@param cfg table current CompetiTest configuration
+function storage_utils.store_received_task_config(filepath, confirm_overwriting, task, cfg)
 	if confirm_overwriting and utils.does_file_exist(filepath) then
 		local choice = vim.fn.confirm('Do you want to overwrite "' .. filepath .. '"?', "Yes\nNo")
-		if choice == 0 or choice == 2 then
+		if choice == 0 or choice == 2 then -- user pressed <esc> or chose "No"
 			return
-		end -- user pressed <esc> or chose "No"
+		end
 	end
 
 	local file_extension = vim.fn.fnamemodify(filepath, ":e")
@@ -173,7 +421,7 @@ function M.store_problem_config(filepath, confirm_overwriting, task, cfg)
 	end
 
 	if template_file then
-		template_file = string.gsub(template_file, "^%~", vim.loop.os_homedir()) -- expand tilde into home directory
+		template_file = string.gsub(template_file, "^%~", luv.os_homedir()) -- expand tilde into home directory
 		if not utils.does_file_exist(template_file) then
 			if type(cfg.template_file) == "table" then -- notify file absence when path is explicitly set
 				utils.notify('template file "' .. template_file .. "\" doesn't exist.", "WARN")
@@ -187,7 +435,8 @@ function M.store_problem_config(filepath, confirm_overwriting, task, cfg)
 	if template_file then
 		if cfg.evaluate_template_modifiers then
 			local str = utils.load_file_as_string(template_file)
-			local evaluated_str = M.eval_receive_modifiers(str, task, file_extension, false, cfg.date_format)
+			assert(str, "CompetiTest.nvim: store_received_task_config: cannot load '" .. template_file .. "'")
+			local evaluated_str = storage_utils.eval_receive_modifiers(str, task, file_extension, false, cfg.date_format)
 			utils.write_string_on_file(filepath, evaluated_str or "")
 		else
 			utils.create_directory(file_directory)
@@ -205,6 +454,7 @@ function M.store_problem_config(filepath, confirm_overwriting, task, cfg)
 		tcindex = tcindex + 1
 	end
 
+	local testcases = require("competitest.testcases")
 	local tcdir = file_directory .. "/" .. cfg.testcases_directory .. "/"
 	if cfg.testcases_use_single_file then
 		local single_file_path = tcdir .. utils.eval_string(filepath, cfg.testcases_single_file_format)
@@ -212,6 +462,79 @@ function M.store_problem_config(filepath, confirm_overwriting, task, cfg)
 	else
 		testcases.io_files.write_eval_format_string(tcdir, tctbl, filepath, cfg.testcases_input_file_format, cfg.testcases_output_file_format)
 	end
+end
+
+---Utility function to store a single received problem
+---@param task CCTask received task
+---@param cfg table current CompetiTest configuration
+---@param finished fun()? a function that must be called when procedure finishes
+function storage_utils.store_single_problem(task, cfg, finished)
+	local evaluated_problem_path = storage_utils.eval_path(cfg.received_problems_path, task, cfg.received_files_extension)
+	if not evaluated_problem_path then
+		utils.notify("'received_problems_path' evaluation failed for task '" .. task.name .. "'")
+		if finished then
+			finished()
+		end
+		return
+	end
+
+	local widgets = require("competitest.widgets")
+	widgets.input("Choose problem path", evaluated_problem_path, cfg.floating_border, not cfg.received_problems_prompt_path, function(filepath)
+		local config = require("competitest.config")
+		local local_cfg = config.load_local_config_and_extend(vim.fn.fnamemodify(filepath, ":h"))
+		storage_utils.store_received_task_config(filepath, true, task, local_cfg)
+		if local_cfg.open_received_problems then
+			vim.api.nvim_command("edit " .. vim.fn.fnameescape(filepath))
+		end
+		if finished then
+			finished()
+		end
+	end, finished)
+end
+
+---Utility function to store received contest
+---@param tasks CCTask[] received tasks
+---@param cfg table current CompetiTest configuration
+---@param finished fun()? a function that must be called when procedure finishes
+function storage_utils.store_contest(tasks, cfg, finished)
+	local contest_directory = storage_utils.eval_path(cfg.received_contests_directory, tasks[1], cfg.received_files_extension)
+	if not contest_directory then
+		utils.notify("'received_contests_directory' evaluation failed")
+		if finished then
+			finished()
+		end
+		return
+	end
+
+	local widgets = require("competitest.widgets")
+	widgets.input("Choose contest directory", contest_directory, cfg.floating_border, not cfg.received_contests_prompt_directory, function(directory)
+		local config = require("competitest.config")
+		local local_cfg = config.load_local_config_and_extend(directory)
+		widgets.input(
+			"Choose files extension",
+			local_cfg.received_files_extension,
+			local_cfg.floating_border,
+			not local_cfg.received_contests_prompt_extension,
+			function(file_extension)
+				for _, task in ipairs(tasks) do
+					local problem_path = storage_utils.eval_path(local_cfg.received_contests_problems_path, task, file_extension)
+					if problem_path then
+						local filepath = directory .. "/" .. problem_path
+						storage_utils.store_received_task_config(filepath, true, task, local_cfg)
+						if local_cfg.open_received_contests then
+							vim.api.nvim_command("edit " .. vim.fn.fnameescape(filepath))
+						end
+					else
+						utils.notify("'received_contests_problems_path' evaluation failed for task '" .. task.name .. "'")
+					end
+				end
+				if finished then
+					finished()
+				end
+			end,
+			finished
+		)
+	end, finished)
 end
 
 return M

@@ -29,7 +29,7 @@ function M.setup(opts)
 				if lastword == "convert"
 					return "auto\nfiles_to_singlefile\nsinglefile_to_files"
 				elseif lastword == "receive"
-					return "testcases\nproblem\ncontest"
+					return "testcases\nproblem\ncontest\npersistently\nstatus\nstop"
 				endif
 			endif
 			return ""
@@ -43,6 +43,15 @@ function M.setup(opts)
 
 		-- resize ui autocommand
 		vim.api.nvim_command("autocmd VimResized * lua require('competitest').resize_ui()")
+
+		-- start receiving persistently if required
+		if config.current_setup.start_receiving_persistently_on_setup then
+			if vim.v.vim_did_enter == 1 then
+				require("competitest.commands").receive("persistently")
+			else
+				vim.api.nvim_command("autocmd VimEnter * lua require('competitest.commands').receive('persistently')")
+			end
+		end
 	end
 end
 

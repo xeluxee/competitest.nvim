@@ -132,6 +132,7 @@ local default_config = {
 
 	companion_port = 27121, -- competitive companion port
 	receive_print_message = true,
+	start_receiving_persistently_on_setup = false,
 	template_file = false,
 	evaluate_template_modifiers = false,
 	date_format = "%c",
