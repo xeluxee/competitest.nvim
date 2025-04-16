@@ -1,19 +1,23 @@
-local nui_popup = require("nui.popup")
-local M = {}
+---@type competitest.RunnerUI.interface
+local M = {} ---@diagnostic disable-line: missing-fields
 
----@param config table: table containing user configuration
-function M.compute_layout(config)
+---Compute popup UI layout
+---@param config competitest.Config
+---@return table<competitest.RunnerUI.standard_window, { width: integer, height: integer }> sizes, table<competitest.RunnerUI.standard_window, { col: integer, row: integer }> positions
+local function compute_layout(config)
+	---@type table<competitest.RunnerUI.standard_window, { width: integer, height: integer }>
 	local sizes = { tc = {}, si = {}, so = {}, se = {}, eo = {} }
+	---@type table<competitest.RunnerUI.standard_window, { col: integer, row: integer }>
 	local positions = { tc = {}, si = {}, so = {}, se = {}, eo = {} }
 
 	---Recursively compute popup layout
-	---@param layout table: layout description
-	---@param vertical boolean: whether to proceed vertically or horizontally
-	---@param width integer: rectangle width
-	---@param height integer: rectangle height
-	---@param col integer: starting column
-	---@param row integer: starting row
-	local function compute_layout(layout, vertical, width, height, col, row)
+	---@param layout competitest.RunnerUI.layout | competitest.RunnerUI.standard_window
+	---@param vertical boolean whether to proceed vertically or horizontally
+	---@param width integer rectangle width
+	---@param height integer rectangle height
+	---@param col integer starting column
+	---@param row integer starting row
+	local function rec_compute_layout(layout, vertical, width, height, col, row)
 		if type(layout) == "string" then
 			sizes[layout].width = width - 2
 			sizes[layout].height = height - 2
@@ -36,9 +40,9 @@ function M.compute_layout(config)
 			end
 
 			if vertical then
-				compute_layout(l[2], not vertical, width, popup_size, col, row + current_size)
+				rec_compute_layout(l[2], not vertical, width, popup_size, col, row + current_size)
 			else
-				compute_layout(l[2], not vertical, popup_size, height, col + current_size, row)
+				rec_compute_layout(l[2], not vertical, popup_size, height, col + current_size, row)
 			end
 			current_size = current_size + popup_size
 		end
@@ -50,14 +54,15 @@ function M.compute_layout(config)
 	local initial_col = math.floor((vim_width - total_width) / 2 + 0.5)
 	local initial_row = math.floor((vim_height - total_height) / 2 + 0.5)
 
-	compute_layout(config.popup_ui.layout, false, total_width, total_height, initial_col, initial_row)
+	rec_compute_layout(config.popup_ui.layout, false, total_width, total_height, initial_col, initial_row)
 	return sizes, positions
 end
 
----Initialize popup UI
----@param windows table: table containing windows
----@param config table: table containing user configuration
 function M.init_ui(windows, config)
+	---@cast windows table<competitest.RunnerUI.window, NuiPopup>
+	local nui_popup = require("nui.popup")
+
+	---@type nui_popup_options
 	local popup_settings = {
 		zindex = 50,
 		border = {
@@ -78,38 +83,38 @@ function M.init_ui(windows, config)
 			spell = false,
 		},
 	}
-	local sizes, positions = M.compute_layout(config)
+	local sizes, positions = compute_layout(config)
 
 	-- testcases selector popup
 	popup_settings.border.text.top = " Testcases "
-	popup_settings.size = sizes["tc"]
-	popup_settings.position = positions["tc"]
+	popup_settings.size = sizes.tc
+	popup_settings.position = positions.tc
 	windows.tc = nui_popup(vim.deepcopy(popup_settings))
 
 	popup_settings.win_options.number = config.runner_ui.show_nu
 	popup_settings.win_options.relativenumber = config.runner_ui.show_rnu
 	-- stdout popup
 	popup_settings.border.text.top = " Output "
-	popup_settings.size = sizes["so"]
-	popup_settings.position = positions["so"]
+	popup_settings.size = sizes.so
+	popup_settings.position = positions.so
 	windows.so = nui_popup(popup_settings)
 
 	-- expected output popup
 	popup_settings.border.text.top = " Expected Output "
-	popup_settings.size = sizes["eo"]
-	popup_settings.position = positions["eo"]
+	popup_settings.size = sizes.eo
+	popup_settings.position = positions.eo
 	windows.eo = nui_popup(popup_settings)
 
 	-- stdin popup
 	popup_settings.border.text.top = " Input "
-	popup_settings.size = sizes["si"]
-	popup_settings.position = positions["si"]
+	popup_settings.size = sizes.si
+	popup_settings.position = positions.si
 	windows.si = nui_popup(popup_settings)
 
 	-- stderr popup
 	popup_settings.border.text.top = " Errors "
-	popup_settings.size = sizes["se"]
-	popup_settings.position = positions["se"]
+	popup_settings.size = sizes.se
+	popup_settings.position = positions.se
 	windows.se = nui_popup(popup_settings)
 
 	windows.so:mount()
@@ -119,8 +124,8 @@ function M.init_ui(windows, config)
 	windows.tc:mount()
 end
 
--- Show popup UI
 function M.show_ui(windows)
+	---@cast windows table<competitest.RunnerUI.window, NuiPopup>
 	for n, w in pairs(windows) do
 		if n ~= "vw" then -- show ui but not viewer popup
 			w:show()

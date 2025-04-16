@@ -214,7 +214,7 @@ require('competitest').setup {
 			focus_next = { "j", "<down>", "<Tab>" },
 			focus_prev = { "k", "<up>", "<S-Tab>" },
 			close = { "<esc>", "<C-c>", "q", "Q" },
-			submit = { "<cr>" },
+			submit = "<cr>",
 		},
 	},
 	editor_ui = {

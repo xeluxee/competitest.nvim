@@ -6,9 +6,9 @@ local widgets = require("competitest.widgets")
 local M = {}
 
 ---Handle CompetiTest subcommands
----@param args string: command line arguments
-function M.command(args)
-	args = vim.split(args, " ", { plain = true, trimempty = true })
+---@param arguments string command line arguments
+function M.command(arguments)
+	local args = vim.split(arguments, " ", { plain = true, trimempty = true })
 	if not args[1] then
 		utils.notify("command: at least one argument required.")
 		return
@@ -31,6 +31,7 @@ function M.command(args)
 		return false
 	end
 
+	---@type table<string, fun()>
 	local subcommands = {
 		add_testcase = function()
 			if check_subargs(0, 0) then
@@ -87,8 +88,8 @@ function M.command(args)
 end
 
 ---Start testcase editor to add a new testcase or to edit a testcase that already exists
----@param add_testcase boolean: if true a new testcases will be added, otherwise edit a testcase that already exists
----@param tcnum integer | nil: testcase number
+---@param add_testcase boolean if `true` a new testcases will be added, otherwise edit a testcase that already exists
+---@param tcnum integer? testcase number
 function M.edit_testcase(add_testcase, tcnum)
 	local bufnr = api.nvim_get_current_buf()
 	config.load_buffer_config(bufnr) -- reload buffer configuration since it may have been updated in the meantime
@@ -101,13 +102,17 @@ function M.edit_testcase(add_testcase, tcnum)
 		tctbl[tcnum] = { input = "", output = "" }
 	end
 
-	local function start_editor(item) -- item.id is testcase number
-		if not tctbl[item.id] then
-			utils.notify("edit_testcase: testcase " .. tostring(item.id or tcnum) .. " doesn't exist!")
+	---Start testcase editor to edit a testcase
+	---@param tcnum integer testcase number
+	---@diagnostic disable-next-line: redefined-local
+	local function start_editor(tcnum)
+		if not tctbl[tcnum] then
+			utils.notify("edit_testcase: testcase " .. tostring(tcnum) .. " doesn't exist!")
 			return
 		end
-		tcnum = item.id
 
+		---Save edited testcase
+		---@param tc competitest.FullTestcase
 		local function save_data(tc)
 			if config.get_buffer_config(bufnr).testcases_use_single_file then
 				tctbl[tcnum] = tc
@@ -123,23 +128,25 @@ function M.edit_testcase(add_testcase, tcnum)
 	if not tcnum then
 		widgets.picker(bufnr, tctbl, "Edit a Testcase", start_editor, api.nvim_get_current_win())
 	else
-		start_editor({ id = tcnum })
+		start_editor(tcnum)
 	end
 end
 
 ---Delete a testcase
----@param tcnum integer | nil: testcase number
+---@param tcnum integer? testcase number
 function M.delete_testcase(tcnum)
 	local bufnr = api.nvim_get_current_buf()
 	config.load_buffer_config(bufnr) -- reload buffer configuration since it may have been updated in the meantime
 	local tctbl = testcases.buf_get_testcases(bufnr)
 
-	local function delete_testcase(item) -- item.id is testcase number
-		if not tctbl[item.id] then
-			utils.notify("delete_testcase: testcase " .. tostring(item.id or tcnum) .. " doesn't exist!")
+	---Delete a testcase
+	---@param tcnum integer testcase number
+	---@diagnostic disable-next-line: redefined-local
+	local function delete_testcase(tcnum) -- item.id is testcase number
+		if not tctbl[tcnum] then
+			utils.notify("delete_testcase: testcase " .. tostring(tcnum) .. " doesn't exist!")
 			return
 		end
-		tcnum = item.id
 
 		local choice = vim.fn.confirm("Are you sure you want to delete Testcase " .. tcnum .. "?", "Yes\nNo")
 		if choice == 0 or choice == 2 then
@@ -157,12 +164,12 @@ function M.delete_testcase(tcnum)
 	if not tcnum then
 		widgets.picker(bufnr, tctbl, "Delete a Testcase", delete_testcase, api.nvim_get_current_win())
 	else
-		delete_testcase({ id = tcnum })
+		delete_testcase(tcnum)
 	end
 end
 
 ---Convert testcases from single file to multiple files and vice versa
----@param mode string: can be "singlefile_to_files", "files_to_singlefile" or "auto"
+---@param mode "singlefile_to_files" | "files_to_singlefile" | "auto"
 function M.convert_testcases(mode)
 	local bufnr = api.nvim_get_current_buf()
 	local singlefile_tctbl = testcases.single_file.buf_load(bufnr)
@@ -226,23 +233,27 @@ function M.convert_testcases(mode)
 	end
 end
 
-M.runners = {} -- runners associated with a buffer
+---Runners associated with each buffer
+---@type table<integer, competitest.TCRunner>
+M.runners = {}
 
----Unload a runner (called on BufUnload)
+---Unload a runner (called on `BufUnload`)
+---@param bufnr integer
 function M.remove_runner(bufnr)
 	M.runners[bufnr] = nil
 end
 
 ---Start testcases runner
----@param testcases_list table | nil: list with integers representing testcases to run, or nil to run all the testcases
----@param compile boolean: whether to compile or not
----@param only_show boolean: if true show previously closed CompetiTest windows without executing testcases
+---@param testcases_list string[]? list with integers representing testcases to run, or `nil` to run all the testcases
+---@param compile boolean whether to compile or not
+---@param only_show boolean if `true` show previously closed CompetiTest windows without executing testcases
 function M.run_testcases(testcases_list, compile, only_show)
 	local bufnr = api.nvim_get_current_buf()
 	config.load_buffer_config(bufnr)
 	local tctbl = testcases.buf_get_testcases(bufnr)
 
 	if testcases_list then
+		---@type competitest.TcTable
 		local new_tctbl = {}
 		for _, tcnum in ipairs(testcases_list) do
 			local num = tonumber(tcnum)
@@ -290,6 +301,7 @@ function M.receive(mode)
 	elseif mode == "problem" or mode == "contest" or mode == "persistently" then
 		local cfg = config.load_local_config_and_extend(vim.fn.getcwd())
 		local notify = cfg.receive_print_message
+		---@diagnostic disable-next-line: param-type-mismatch
 		error = receive.start_receiving(mode, cfg.companion_port, notify, notify, nil, cfg)
 	else
 		error = "unrecognized mode '" .. tostring(mode) .. "'"

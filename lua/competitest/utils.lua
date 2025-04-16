@@ -1,19 +1,26 @@
-local luv = vim.loop
+local luv = vim.uv and vim.uv or vim.loop
 local M = {}
 
----Show a CompetiTest notification with vim.notify()
----@param msg string: message to display
----@param log_level string | nil: a log level among the ones available in vim.log.levels. When nil it defaults to ERROR
+---Show a CompetiTest notification with `vim.notify()`
+---@param msg string message to display
+---@param log_level string? a log level among the ones available in `vim.log.levels`, when `nil` it defaults to `ERROR`
 function M.notify(msg, log_level)
 	vim.notify("CompetiTest.nvim: " .. msg, vim.log.levels[log_level or "ERROR"], { title = "CompetiTest" })
 end
 
+---@alias competitest.StringModifier # CompetiTest string modifier
+---| string string to replace a modifier with
+---| fun(arg: any?): string function accepting up to one argument and returning a string to replace a modifier with
+
+---@alias competitest.StringModifiersTable table<string, competitest.StringModifier> table associating modifiers name to CompetiTest string modifiers
+
 ---Convert a string with CompetiTest modifiers into a formatted string
----@param str string: the string to format
----@param modifiers table: table associating modifiers name to a string or a function accepting up to one argument
----@param argument any: argument of function modifiers
----@return string | nil: the converted string, or nil on failure
+---@param str string the string to format
+---@param modifiers competitest.StringModifiersTable
+---@param argument any? argument of function modifiers
+---@return string? # the converted string, or `nil` on failure
 function M.format_string_modifiers(str, modifiers, argument)
+	---@type string[]
 	local evaluated_str = {}
 	local mod_start = 0 -- modifier starting position (0 means idle state)
 	for i = 1, #str do
@@ -48,13 +55,13 @@ function M.format_string_modifiers(str, modifiers, argument)
 	return table.concat(evaluated_str)
 end
 
--- CompetiTest file-format modifiers
--- They can be strings or function accepting up to one argument, the absolute file path
+---CompetiTest file-format modifiers
+---@type competitest.StringModifiersTable
 M.file_format_modifiers = {
 	-- $(): replace it with a dollar
 	[""] = "$",
 
-	-- $(HOME): home user directory
+	-- $(HOME): user home directory
 	["HOME"] = function()
 		return luv.os_homedir()
 	end,
@@ -85,37 +92,37 @@ M.file_format_modifiers = {
 	end,
 
 	-- $(TCNUM): testcase number; it will be set later
-	["TCNUM"] = nil,
+	["TCNUM"] = "",
 }
 
 ---Convert a string with CompetiTest file-format modifiers into a formatted string
----@param filepath string: absolute file path, to evaluate string from
----@param str string: the string to evaluate
----@return string | nil: the converted string, or nil on failure
+---@param filepath string absolute file path, to evaluate string from
+---@param str string the string to evaluate
+---@return string? # the converted string, or `nil` on failure
 function M.eval_string(filepath, str)
 	return M.format_string_modifiers(str, M.file_format_modifiers, filepath)
 end
 
 ---Convert a string with CompetiTest file-format modifiers into a formatted string, but considering the given buffer
----@param bufnr integer: buffer number, representing the buffer to evaluate string from
----@param str string: the string to evaluate
----@param tcnum integer | string | nil: testcase number or identifier
----@return string | nil: the converted string, or nil on failure
+---@param bufnr integer buffer number, representing the buffer to evaluate string from
+---@param str string the string to evaluate
+---@param tcnum integer | string | nil testcase number or identifier
+---@return string? # the converted string, or `nil` on failure
 function M.buf_eval_string(bufnr, str, tcnum)
 	M.file_format_modifiers["TCNUM"] = tostring(tcnum or "") -- testcase number
 	return M.eval_string(vim.api.nvim_buf_get_name(bufnr), str)
 end
 
----Returns true if the given file exists, false otherwise
+---Returns `true` if the given file exists, `false` otherwise
 ---@param filepath string
 ---@return boolean
 function M.does_file_exist(filepath)
 	return luv.fs_stat(filepath) ~= nil
 end
 
----Returns the content of the specified file as a string, or nil if the given path is invalid
+---Returns the content of the specified file as a string, or `nil` if the given path is invalid
 ---@param filepath string
----@return string | nil
+---@return string?
 function M.load_file_as_string(filepath)
 	local fd = luv.fs_open(filepath, "r", 438)
 	if fd == nil then
@@ -124,11 +131,12 @@ function M.load_file_as_string(filepath)
 	local stat = assert(luv.fs_fstat(fd), "CompetiTest.nvim: load_file_as_string: cannot stat file '" .. filepath .. "'")
 	local content = assert(luv.fs_read(fd, stat.size, 0), "CompetiTest.nvim: load_file_as_string: cannot read file '" .. filepath .. "'")
 	assert(luv.fs_close(fd), "CompetiTest.nvim: load_file_as_string: unable to close '" .. filepath .. "'")
-	return string.gsub(content, "\r\n", "\n") -- convert CRLF to LF
+	content = string.gsub(content, "\r\n", "\n") -- convert CRLF to LF
+	return content
 end
 
 ---Create the specified directory if it doesn't exist
----@param dirpath string: directory absolute path
+---@param dirpath string directory absolute path
 function M.create_directory(dirpath)
 	if not luv.fs_opendir(dirpath) then
 		dirpath = string.gsub(dirpath, "[/\\]+$", "") -- trim trailing slashes
@@ -159,8 +167,7 @@ function M.delete_file(filepath)
 end
 
 ---Get Neovim UI width and height
----@return integer: width, number of columns
----@return integer: height, number of rows
+---@return integer width, integer height width (number of columns) and height (number of rows)
 function M.get_ui_size()
 	local height = vim.o.lines - vim.o.cmdheight
 	if vim.o.laststatus ~= 0 then

@@ -2,13 +2,81 @@ local api = vim.api
 local nui_event = require("nui.utils.autocmd").event
 local utils = require("competitest.utils")
 
-local RunnerUI = {}
-RunnerUI.__index = RunnerUI
+---@alias competitest.RunnerUI.textual_window # runner UI window showing textual data
+---| "si" standard input window
+---| "so" standard output window
+---| "se" standard error window
+---| "eo" expected output window
 
----Create a new user interface for testcases runner
----@param runner TCRunner: associated testcase runner
----@return object: a new RunnerUI object, or nil on failure
+---@alias competitest.RunnerUI.standard_window # runner UI standard window, i.e. a textual window or testcases selector window
+---| competitest.RunnerUI.textual_window textual windows
+---| "tc" testcases selector window
+
+---@alias competitest.RunnerUI.window # runner UI window
+---| competitest.RunnerUI.standard_window standard windows
+---| "vw" viewer popup window
+
+---Runner UI layout window definition
+---@class (exact) competitest.RunnerUI.layout.window
+---@field [1] number ratio between window size and the sizes of other windows in the same layout
+---@field [2] competitest.RunnerUI.standard_window | competitest.RunnerUI.layout standard window type or another layout for a sub-layout
+
+---@alias competitest.RunnerUI.layout competitest.RunnerUI.layout.window[] Runner UI layout
+
+---@alias competitest.RunnerUI.windows_table table<competitest.RunnerUI.window, NuiPopup | NuiSplit> table associating runner UI window name to `NuiPopup` or `NuiSplit` object
+
+---Runner UI interface
+---@class (exact) competitest.RunnerUI.interface
+---@field init_ui fun(windows: competitest.RunnerUI.windows_table, config: competitest.Config, init_winid: integer?) function to initialize UI, accepting runner UI windows table, current CompetiTest configuration and optionally the id of window associated to runner
+---@field show_ui fun(windows: competitest.RunnerUI.windows_table)? function to show UI when already initialized, or `nil` if UI always needs to be re-initialized
+
+---@alias competitest.RunnerUI.user_action # Runner UI user action
+---| "run_again" run again a testcase
+---| "run_all_again" run again all testcases
+---| "kill" kill a testcase
+---| "kill_all" kill all testcases
+---| "view_input" view input (stdin) in a bigger window
+---| "view_output" view expected output in a bigger window
+---| "view_stdout" view program output (stdout) in a bigger window
+---| "view_stderr" view program errors (stderr) in a bigger window
+---| "toggle_diff" toggle diff view between actual and expected output
+---| "close" close runner UI
+
+---Testcases Runner UI
+---@class (exact) competitest.RunnerUI
+---@field private runner competitest.TCRunner
+---@field private ui_initialized boolean
+---@field private ui_visible boolean
+---@field private viewer_initialized boolean
+---@field private viewer_visible boolean
+---@field private viewer_content competitest.RunnerUI.textual_window?
+---@field private diff_view boolean
+---@field restore_winid integer? bring the cursor to the given window when runner UI is closed
+---@field update_details boolean one-time request for `self:update_ui()` to update details windows
+---@field update_windows boolean one-time request for `self:update_ui()` to update all the windows
+---@field private update_testcase integer? index of testcase to update
+---@field private windows competitest.RunnerUI.windows_table
+---@field private interface competitest.RunnerUI.interface
+---@field private make_viewer_visible boolean one-time request for `self:update_ui()` to open viewer after updating details
+local RunnerUI = {}
+RunnerUI.__index = RunnerUI ---@diagnostic disable-line: inject-field
+
+---Create a new `RunnerUI`
+---@param runner competitest.TCRunner associated testcase runner
+---@return competitest.RunnerUI? # a new `RunnerUI`, or `nil` on failure
 function RunnerUI:new(runner)
+	---@type competitest.RunnerUI.interface
+	local interface
+	if runner.config.runner_ui.interface == "popup" then
+		interface = require("competitest.runner_ui.popup")
+	elseif runner.config.runner_ui.interface == "split" then
+		interface = require("competitest.runner_ui.split")
+	else
+		utils.notify("RunnerUI:new: unrecognized user interface " .. vim.inspect(runner.config.runner_ui.interface) .. ".")
+		return nil
+	end
+
+	---@type competitest.RunnerUI
 	local this = {
 		runner = runner,
 		ui_initialized = false,
@@ -18,54 +86,35 @@ function RunnerUI:new(runner)
 		viewer_content = nil,
 		diff_view = runner.config.view_output_diff,
 		restore_winid = runner.restore_winid,
-		update_details = false, -- if true update details windows
-		update_windows = false, -- if true update all the windows
-		update_testcase = nil, -- index of testcase to update
-
-		windows = {
-			si = nil, -- standard input
-			so = nil, -- standard output
-			se = nil, -- standard error
-			eo = nil, -- expected output
-			tc = nil, -- testcases selector
-			vw = nil, -- viewer popup
-		},
-		tcdata = nil, -- table containing testcases data and results
+		update_details = false,
+		update_windows = false,
+		update_testcase = nil,
+		windows = {},
+		interface = interface,
+		make_viewer_visible = false,
 	}
-
-	local interface = runner.config.runner_ui.interface
-	if interface == "popup" then
-		this.interface = require("competitest.runner_ui.popup")
-	elseif interface == "split" then
-		this.interface = require("competitest.runner_ui.split")
-	else
-		utils.notify("RunnerUI:new: unrecognized user interface " .. vim.inspect(interface) .. ".")
-		return nil
-	end
-
 	setmetatable(this, self)
 	return this
 end
 
----This method is called every time Neovim window gets resized (autocmd VimResized)
----It re-initializes RunnerUI
+---Re-initialize UI, this method is called every time Neovim window gets resized (`autocmd VimResized`)
 function RunnerUI:resize_ui()
 	local cursor_position = self.ui_visible and api.nvim_win_get_cursor(self.windows.tc.winid) -- restore cursor position later
 	local was_viewer_visible = self.viewer_visible -- make viewer visible later
 	self:delete()
 	if cursor_position then -- if cursor_position isn't nil ui was visible
+		self.make_viewer_visible = was_viewer_visible
 		self:show_ui()
 		vim.schedule(function()
-			self.make_viewer_visible = was_viewer_visible -- make update_ui() open viewer after updating details
 			api.nvim_win_set_cursor(self.windows.tc.winid, cursor_position)
 		end)
 	end
 end
 
----Show Runner UI if not already shown
----It initializes UI if called for the first time or resized
+---Show Runner UI if not already shown.
+---It initializes UI if called for the first time or resized.
 function RunnerUI:show_ui()
-	if not self.ui_initialized or (self.interface.init_ui_only and not self.ui_visible) then -- initialize ui
+	if not self.ui_initialized or (not self.interface.show_ui and not self.ui_visible) then -- initialize ui
 		self.interface.init_ui(self.windows, self.runner.config, self.restore_winid)
 
 		-- set buffer name and variable
@@ -84,9 +133,14 @@ function RunnerUI:show_ui()
 		end
 
 		-- set keymaps
+
+		---@type table<competitest.RunnerUI.user_action, keymap[]>
+		local runner_ui_mappings = {}
 		for action, maps in pairs(self.runner.config.runner_ui.mappings) do
 			if type(maps) == "string" then -- turn string into table
-				self.runner.config.runner_ui.mappings[action] = { maps }
+				runner_ui_mappings[action] = { maps }
+			else
+				runner_ui_mappings[action] = maps
 			end
 		end
 
@@ -101,7 +155,7 @@ function RunnerUI:show_ui()
 		end
 
 		-- close windows keymaps
-		for _, map in ipairs(self.runner.config.runner_ui.mappings.close) do
+		for _, map in ipairs(runner_ui_mappings.close) do
 			for n, w in pairs(self.windows) do
 				if n ~= "vw" then
 					w:map("n", map, hide_ui, { noremap = true })
@@ -125,34 +179,33 @@ function RunnerUI:show_ui()
 		end
 
 		-- kill current process
-		for _, map in ipairs(self.runner.config.runner_ui.mappings.kill) do
+		for _, map in ipairs(runner_ui_mappings.kill) do
 			self.windows.tc:map("n", map, function()
 				local tcindex = get_testcase_index_by_line()
 				self.runner:kill_process(tcindex)
-				self.runner.run_next_tc()
 			end, { noremap = true })
 		end
 
 		-- kill all processes
-		for _, map in ipairs(self.runner.config.runner_ui.mappings.kill_all) do
+		for _, map in ipairs(runner_ui_mappings.kill_all) do
 			self.windows.tc:map("n", map, function()
 				self.runner:kill_all_processes()
 			end, { noremap = true })
 		end
 
 		-- run again current testcase
-		for _, map in ipairs(self.runner.config.runner_ui.mappings.run_again) do
+		for _, map in ipairs(runner_ui_mappings.run_again) do
 			self.windows.tc:map("n", map, function()
 				local tcindex = get_testcase_index_by_line()
 				self.runner:kill_process(tcindex)
 				vim.schedule(function()
-					self.runner.run_next_tc(tcindex)
+					self.runner:run_testcase(tcindex)
 				end)
 			end, { noremap = true })
 		end
 
 		-- run again all testcases
-		for _, map in ipairs(self.runner.config.runner_ui.mappings.run_all_again) do
+		for _, map in ipairs(runner_ui_mappings.run_all_again) do
 			self.windows.tc:map("n", map, function()
 				self.runner:kill_all_processes()
 				vim.schedule(function()
@@ -162,7 +215,7 @@ function RunnerUI:show_ui()
 		end
 
 		-- toggle diff view between expected and standard output
-		for _, map in ipairs(self.runner.config.runner_ui.mappings.toggle_diff) do
+		for _, map in ipairs(runner_ui_mappings.toggle_diff) do
 			self.windows.tc:map("n", map, function()
 				self:toggle_diff_view()
 			end, { noremap = true })
@@ -175,19 +228,19 @@ function RunnerUI:show_ui()
 		end
 
 		-- view output (stdout) in a bigger window
-		for _, map in ipairs(self.runner.config.runner_ui.mappings.view_stdout) do
+		for _, map in ipairs(runner_ui_mappings.view_stdout) do
 			open_viewer(map, "so")
 		end
 		-- view expected output in a bigger window
-		for _, map in ipairs(self.runner.config.runner_ui.mappings.view_output) do
+		for _, map in ipairs(runner_ui_mappings.view_output) do
 			open_viewer(map, "eo")
 		end
 		-- view input (stdin) in a bigger window
-		for _, map in ipairs(self.runner.config.runner_ui.mappings.view_input) do
+		for _, map in ipairs(runner_ui_mappings.view_input) do
 			open_viewer(map, "si")
 		end
 		-- view stderr in a bigger window
-		for _, map in ipairs(self.runner.config.runner_ui.mappings.view_stderr) do
+		for _, map in ipairs(runner_ui_mappings.view_stderr) do
 			open_viewer(map, "se")
 		end
 
@@ -228,6 +281,7 @@ local function win_set_diff(winid, enable_diff)
 	end
 end
 
+---@private
 ---Toggle diffview between standard output and expected output windows
 function RunnerUI:toggle_diff_view()
 	self.diff_view = not self.diff_view
@@ -235,12 +289,14 @@ function RunnerUI:toggle_diff_view()
 	win_set_diff(self.windows.so.winid, self.diff_view)
 end
 
+---@private
 ---Disable diffview between standard output and expected output windows
 function RunnerUI:disable_diff_view()
 	win_set_diff(self.windows.eo.winid, false)
 	win_set_diff(self.windows.so.winid, false)
 end
 
+---@private
 ---Hide RunnerUI preserving buffers, so it can be shown later
 function RunnerUI:hide_ui()
 	if self.ui_visible then
@@ -252,10 +308,13 @@ function RunnerUI:hide_ui()
 		end
 		self.ui_visible = false
 		self.viewer_visible = false
-		api.nvim_set_current_win(self.restore_winid or 0)
+		if self.restore_winid and api.nvim_win_is_valid(self.restore_winid) then
+			api.nvim_set_current_win(self.restore_winid)
+		end
 	end
 end
 
+---@private
 ---Delete RunnerUI and uninitialize all the windows
 function RunnerUI:delete()
 	if self.ui_visible then
@@ -271,11 +330,14 @@ function RunnerUI:delete()
 	self.ui_visible = false
 	self.viewer_initialized = false
 	self.viewer_visible = false
-	api.nvim_set_current_win(self.restore_winid or 0)
+	if self.restore_winid and api.nvim_win_is_valid(self.restore_winid) then
+		api.nvim_set_current_win(self.restore_winid)
+	end
 end
 
+---@private
 ---Open viewer popup
----@param window_name string | nil: show window content in viewer popup
+---@param window_name competitest.RunnerUI.textual_window? show window content in viewer popup, if `nil` show previously shown content
 function RunnerUI:show_viewer_popup(window_name)
 	local function get_viewer_buffer()
 		return self.windows[self.viewer_content].bufnr
@@ -295,6 +357,7 @@ function RunnerUI:show_viewer_popup(window_name)
 
 	if not self.viewer_initialized then
 		local vim_width, vim_height = utils.get_ui_size()
+		---@type nui_popup_options
 		local viewer_popup_settings = {
 			bufnr = get_viewer_buffer(),
 			zindex = 55, -- popup ui has zindex 50
@@ -331,12 +394,12 @@ function RunnerUI:show_viewer_popup(window_name)
 	api.nvim_set_current_win(self.windows.vw.winid)
 end
 
----Return a string of length len, starting with str.
----If str's length is greater than len, str will be truncated
----Otherwise the remaining space will be filled with a fill char (fchar)
----@param len integer: length of final string
----@param str string: initial string
----@param fchar string: char to fill remaining spaces with
+---Return a string of length `len`, starting with `str`.
+---If `str` length is greater than `len`, `str` will be truncated.
+---Otherwise the remaining space will be filled with a fill character (`fchar`)
+---@param len integer length of final string
+---@param str string initial string
+---@param fchar string char to fill remaining spaces with
 ---@return string
 local function adjust_string(len, str, fchar)
 	local strlen = vim.fn.strwidth(str)
@@ -362,7 +425,9 @@ function RunnerUI:update_ui()
 			self.update_windows = false
 			self.update_details = true
 
+			---@type { header: string, status: string, time: string }[]
 			local lines = {}
+			---@type { line: integer, start_pos: integer, end_pos: integer, group: string }[]
 			local hlregions = {}
 
 			for tcindex, data in ipairs(self.runner.tcdata) do
@@ -380,19 +445,21 @@ function RunnerUI:update_ui()
 			end
 
 			-- render lines
+
+			---@type string[]
 			local buffer_lines = {}
 			for _, line in pairs(lines) do
 				local line_str = adjust_string(10, line.header, " ") .. adjust_string(10, line.status, " ") .. line.time
 				table.insert(buffer_lines, line_str)
 			end
 			local bufnr = self.windows.tc.bufnr
-			api.nvim_buf_set_option(bufnr, "modifiable", true)
+			vim.bo[bufnr].modifiable = true
 			api.nvim_buf_set_lines(bufnr, 0, -1, false, buffer_lines)
 			-- render highlights
 			for _, hl in pairs(hlregions) do
 				api.nvim_buf_add_highlight(bufnr, -1, hl.group, hl.line, hl.start_pos, hl.end_pos)
 			end
-			api.nvim_buf_set_option(bufnr, "modifiable", false)
+			vim.bo[bufnr].modifiable = false
 		end
 
 		-- update details windows if not already updated
@@ -404,10 +471,13 @@ function RunnerUI:update_ui()
 				return
 			end
 
+			---Set buffer content
+			---@param bufnr integer
+			---@param content string[]? lines, or `nil` to make buffer empty
 			local function set_buf_content(bufnr, content)
-				api.nvim_buf_set_option(bufnr, "modifiable", true)
+				vim.bo[bufnr].modifiable = true
 				api.nvim_buf_set_lines(bufnr, 0, -1, false, content or {})
-				api.nvim_buf_set_option(bufnr, "modifiable", false)
+				vim.bo[bufnr].modifiable = false
 			end
 
 			set_buf_content(self.windows.so.bufnr, data.stdout)
@@ -417,7 +487,7 @@ function RunnerUI:update_ui()
 		end
 
 		if self.make_viewer_visible then
-			self.make_viewer_visible = nil
+			self.make_viewer_visible = false
 			self:show_viewer_popup()
 		end
 	end)

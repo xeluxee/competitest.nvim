@@ -3,8 +3,10 @@ local utils = require("competitest.utils")
 local M = {}
 local storage_utils = {}
 
----competitive-companion task format
----@class (exact) CCTask
+---@alias competitest.CCTask.batch_id string
+
+---competitive-companion task format (https://github.com/jmerle/competitive-companion/#the-format)
+---@class (exact) competitest.CCTask
 ---@field name string
 ---@field group string
 ---@field url string
@@ -16,22 +18,21 @@ local storage_utils = {}
 ---@field input { type: "stdin" | "file" | "regex", fileName: string?, pattern: string? }
 ---@field output { type: "stdout" | "file", fileName: string? }
 ---@field languages { java: { mainClass: string, taskClass: string }, [string]: any }
----@field batch { id: string, size: integer }
+---@field batch { id: competitest.CCTask.batch_id, size: integer }
 
 ---------------- RECEIVE UTILITIES ----------------
 
 ---Receive tasks from competitive-companion
----@class (exact) Receiver
----@field private __index self
+---@class (exact) competitest.Receiver
 ---@field private server uv.uv_tcp_t
 local Receiver = {}
-Receiver.__index = Receiver
+Receiver.__index = Receiver ---@diagnostic disable-line: inject-field
 
----Create a new Receiver and start listening to `address:port`
+---Create a new `Receiver` and start listening to `address:port`
 ---@param address string address to bind server socket to
 ---@param port integer port to bind server socket to
----@param callback fun(task: CCTask) called every time EOF is reached from an incoming stream, accepting the received task as argument
----@return Receiver | string # a new Receiver object, or string describing error on failure
+---@param callback fun(task: competitest.CCTask) called every time EOF is reached from an incoming stream, accepting the received task as argument
+---@return competitest.Receiver | string # a new `Receiver`, or string describing error on failure
 function Receiver:new(address, port, callback)
 	local server = luv.new_tcp()
 	if not server then
@@ -63,6 +64,7 @@ function Receiver:new(address, port, callback)
 	if not listen_success then
 		return string.format("cannot listen or bind receiver to %s:%d%s", address, port, listen_error and (": " .. listen_error) or "")
 	end
+	---@type competitest.Receiver
 	local this = {
 		server = server,
 	}
@@ -77,20 +79,18 @@ function Receiver:close()
 	end
 end
 
----@alias batch_id string
-
 ---Collect tasks received from competitive-companion and send them to a callback every time a batch is fully received
----@class (exact) TasksCollector
----@field private __index self
----@field private batches { [batch_id]: { size: integer, tasks: CCTask[] } }
----@field private callback fun(tasks: CCTask[])
+---@class (exact) competitest.TasksCollector
+---@field private batches { [competitest.CCTask.batch_id]: { size: integer, tasks: competitest.CCTask[] } }
+---@field private callback fun(tasks: competitest.CCTask[])
 local TasksCollector = {}
-TasksCollector.__index = TasksCollector
+TasksCollector.__index = TasksCollector ---@diagnostic disable-line: inject-field
 
----Create a new tasks collector
----@param callback fun(tasks: CCTask[]) called every time a batch is fully received, accepting a batch of tasks as argument
----@return TasksCollector
+---Create a new `TasksCollector`
+---@param callback fun(tasks: competitest.CCTask[]) called every time a batch is fully received, accepting a batch of tasks as argument
+---@return competitest.TasksCollector
 function TasksCollector:new(callback)
+	---@type competitest.TasksCollector
 	local this = {
 		batches = {},
 		callback = callback,
@@ -100,7 +100,7 @@ function TasksCollector:new(callback)
 end
 
 ---Insert a competitive-companion task into collector
----@param task CCTask
+---@param task competitest.CCTask
 function TasksCollector:insert(task)
 	if not self.batches[task.batch.id] then
 		self.batches[task.batch.id] = { size = task.batch.size, tasks = {} }
@@ -115,19 +115,19 @@ function TasksCollector:insert(task)
 end
 
 ---Process batches of tasks serially
----@class (exact) BatchesSerialProcessor
----@field private __index self
----@field private batches CCTask[][]
----@field private callback fun(tasks: CCTask[], finished: fun())
+---@class (exact) competitest.BatchesSerialProcessor
+---@field private batches competitest.CCTask[][]
+---@field private callback fun(tasks: competitest.CCTask[], finished: fun())
 ---@field private callback_busy boolean
 ---@field private stopped boolean
 local BatchesSerialProcessor = {}
-BatchesSerialProcessor.__index = BatchesSerialProcessor
+BatchesSerialProcessor.__index = BatchesSerialProcessor ---@diagnostic disable-line: inject-field
 
----Create a new batches serial processor
----@param callback fun(tasks: CCTask[], finished: fun()) serially called for every enqueued batch, i.e. no two callbacks run at the same time; it accepts two arguments: batch of tasks and a function that must be called when callback finishes to unlock the batches serial processor
----@return BatchesSerialProcessor
+---Create a new `BatchesSerialProcessor`
+---@param callback fun(tasks: competitest.CCTask[], finished: fun()) serially called for every enqueued batch, i.e. no two callbacks run at the same time; it accepts two arguments: batch of tasks and a function that must be called when callback finishes to unlock the batches serial processor
+---@return competitest.BatchesSerialProcessor
 function BatchesSerialProcessor:new(callback)
+	---@type competitest.BatchesSerialProcessor
 	local this = {
 		batches = {},
 		callback = callback,
@@ -139,7 +139,7 @@ function BatchesSerialProcessor:new(callback)
 end
 
 ---Enqueue a batch of tasks for processing
----@param batch CCTask[]
+---@param batch competitest.CCTask[]
 function BatchesSerialProcessor:enqueue(batch)
 	table.insert(self.batches, batch)
 	self:process()
@@ -170,51 +170,52 @@ end
 
 ---------------- RECEIVE METHODS ----------------
 
----@alias receive_mode "testcases" | "problem" | "contest" | "persistently"
+---@alias competitest.ReceiveMode "testcases" | "problem" | "contest" | "persistently"
 
----@class (exact) ReceiveStatus
----@field mode receive_mode
+---@class (exact) competitest.ReceiveStatus
+---@field mode competitest.ReceiveMode
 ---@field companion_port integer
----@field receiver Receiver
----@field tasks_collector TasksCollector
----@field batches_serial_processor BatchesSerialProcessor
+---@field receiver competitest.Receiver
+---@field tasks_collector competitest.TasksCollector
+---@field batches_serial_processor competitest.BatchesSerialProcessor
 
----@type ReceiveStatus?
-local rt = nil
+---@type competitest.ReceiveStatus?
+local rs = nil
 
 ---Stop receiving, listening to competitive-companion and processing received tasks
 function M.stop_receiving()
-	if rt then
-		rt.receiver:close()
-		rt.batches_serial_processor:stop()
-		rt = nil
+	if rs then
+		rs.receiver:close()
+		rs.batches_serial_processor:stop()
+		rs = nil
 	end
 end
 
 ---Show current receive status trough a notification
 function M.show_status()
 	local msg
-	if not rt then
+	if not rs then
 		msg = "receiving not enabled."
 	else
-		msg = "receiving " .. rt.mode .. ", listening on port " .. rt.companion_port .. "."
+		msg = "receiving " .. rs.mode .. ", listening on port " .. rs.companion_port .. "."
 	end
 	utils.notify(msg, "INFO")
 end
 
 ---Start receiving tasks from competitive-companion
----@param mode receive_mode
+---@param mode competitest.ReceiveMode
 ---@param companion_port integer competitive-companion port to listen to
----@param notify_on_start boolean if true notify user when receiving starts correctly
----@param notify_on_receive boolean if true notify user when data is received
----@param bufnr integer? buffer number, only required when mode = "testcases"
----@param cfg table current CompetiTest configuration
----@return string? # nil, or a string describing error on failure
+---@param notify_on_start boolean if `true` notify user when receiving starts correctly
+---@param notify_on_receive boolean if `true` notify user when data is received
+---@param bufnr integer? buffer number, only required when `mode` is `"testcases"`
+---@param cfg competitest.Config current CompetiTest configuration
+---@return nil | string # `nil`, or a string describing error on failure
 function M.start_receiving(mode, companion_port, notify_on_start, notify_on_receive, bufnr, cfg)
-	if rt then
+	if rs then
 		return "receiving already enabled, stop it if you want to change receive mode"
 	end
-	---@type fun(tasks: CCTask[], finished: fun())
+	---BatchesSerialProcessor callback
+	---@type fun(tasks: competitest.CCTask[], finished: fun())
 	local bsp_callback
 	if mode == "testcases" then
 		if not bufnr then
@@ -285,7 +286,7 @@ function M.start_receiving(mode, companion_port, notify_on_start, notify_on_rece
 	if type(receiver_or_error) == "string" then
 		return receiver_or_error
 	end
-	rt = {
+	rs = {
 		mode = mode,
 		companion_port = companion_port,
 		receiver = receiver_or_error,
@@ -301,11 +302,11 @@ end
 
 ---Convert a string with CompetiTest receive modifiers into a formatted string
 ---@param str string the string to evaluate
----@param task CCTask received task
+---@param task competitest.CCTask received task
 ---@param file_extension string
 ---@param remove_illegal_characters boolean whether to remove windows illegal characters from modifiers or not
 ---@param date_format string? string used to format date
----@return string? # the converted string, or nil on failure
+---@return string? # the converted string, or `nil` on failure
 function storage_utils.eval_receive_modifiers(str, task, file_extension, remove_illegal_characters, date_format)
 	local judge, contest
 	local hyphen = string.find(task.group, " - ", 1, true)
@@ -317,6 +318,8 @@ function storage_utils.eval_receive_modifiers(str, task, file_extension, remove_
 		contest = string.sub(task.group, hyphen + 3)
 	end
 
+	---CompetiTest receive modifiers
+	---@type table<string, string>
 	local receive_modifiers = {
 		[""] = "$", -- $(): replace it with a dollar
 		["HOME"] = luv.os_homedir(), -- home directory
@@ -346,10 +349,10 @@ function storage_utils.eval_receive_modifiers(str, task, file_extension, remove_
 end
 
 ---Get path for received problems or contests
----@param path string | fun(task: CCTask, file_extension: string): string see `received_problems_path`, `received_contests_directory` and `received_contests_problems_path`
----@param task CCTask received task
+---@param path string | fun(task: competitest.CCTask, file_extension: string): string see `received_problems_path`, `received_contests_directory` and `received_contests_problems_path`
+---@param task competitest.CCTask received task
 ---@param file_extension string configured file extension
----@return string? # evaluated path, or nil on failure
+---@return string? # evaluated path, or `nil` on failure
 function storage_utils.eval_path(path, task, file_extension)
 	if type(path) == "string" then
 		return storage_utils.eval_receive_modifiers(path, task, file_extension, true)
@@ -402,8 +405,8 @@ end
 ---Utility function to store received task and its testcases following configuration
 ---@param filepath string source file absolute path
 ---@param confirm_overwriting boolean whether to ask user to overwrite an already existing file or not
----@param task CCTask received task
----@param cfg table current CompetiTest configuration
+---@param task competitest.CCTask received task
+---@param cfg competitest.Config current CompetiTest configuration
 function storage_utils.store_received_task_config(filepath, confirm_overwriting, task, cfg)
 	if confirm_overwriting and utils.does_file_exist(filepath) then
 		local choice = vim.fn.confirm('Do you want to overwrite "' .. filepath .. '"?', "Yes\nNo")
@@ -413,8 +416,11 @@ function storage_utils.store_received_task_config(filepath, confirm_overwriting,
 	end
 
 	local file_extension = vim.fn.fnamemodify(filepath, ":e")
-	local template_file -- template file absolute path
+	---Template file absolute path
+	---@type string?
+	local template_file
 	if type(cfg.template_file) == "string" then -- string with CompetiTest file-format modifiers
+		---@diagnostic disable-next-line: param-type-mismatch
 		template_file = utils.eval_string(filepath, cfg.template_file)
 	elseif type(cfg.template_file) == "table" then -- table with paths to template files
 		template_file = cfg.template_file[file_extension]
@@ -446,6 +452,7 @@ function storage_utils.store_received_task_config(filepath, confirm_overwriting,
 		utils.write_string_on_file(filepath, "")
 	end
 
+	---@type competitest.TcTable
 	local tctbl = {}
 	local tcindex = 0
 	-- convert testcases list into a 0-indexed testcases table
@@ -465,8 +472,8 @@ function storage_utils.store_received_task_config(filepath, confirm_overwriting,
 end
 
 ---Utility function to store a single received problem
----@param task CCTask received task
----@param cfg table current CompetiTest configuration
+---@param task competitest.CCTask received task
+---@param cfg competitest.Config current CompetiTest configuration
 ---@param finished fun()? a function that must be called when procedure finishes
 function storage_utils.store_single_problem(task, cfg, finished)
 	local evaluated_problem_path = storage_utils.eval_path(cfg.received_problems_path, task, cfg.received_files_extension)
@@ -493,8 +500,8 @@ function storage_utils.store_single_problem(task, cfg, finished)
 end
 
 ---Utility function to store received contest
----@param tasks CCTask[] received tasks
----@param cfg table current CompetiTest configuration
+---@param tasks competitest.CCTask[] received tasks
+---@param cfg competitest.Config current CompetiTest configuration
 ---@param finished fun()? a function that must be called when procedure finishes
 function storage_utils.store_contest(tasks, cfg, finished)
 	local contest_directory = storage_utils.eval_path(cfg.received_contests_directory, tasks[1], cfg.received_files_extension)

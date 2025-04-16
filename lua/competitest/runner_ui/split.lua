@@ -1,12 +1,11 @@
-local nui_split = require("nui.split")
-local M = {}
-M.init_ui_only = true -- no method show_ui() because ui is re-initialized to create layout every time it's opened
+---@type competitest.RunnerUI.interface
+local M = {} ---@diagnostic disable-line: missing-fields
 
----Initialize popup UI
----@param windows table: table containing windows
----@param config table: table containing user configuration
----@param init_winid integer: id of window associated to runner
 function M.init_ui(windows, config, init_winid)
+	---@cast windows table<competitest.RunnerUI.window, NuiSplit>
+	local nui_split = require("nui.split")
+
+	---@type nui_split_options
 	local split_settings = {
 		enter = false,
 		relative = { type = "win" },
@@ -24,6 +23,7 @@ function M.init_ui(windows, config, init_winid)
 		},
 	}
 
+	---@type table<competitest.RunnerUI.standard_window, nui_split_options>
 	local settings = {} -- windows splits settings
 	settings.tc = vim.deepcopy(split_settings)
 	split_settings.win_options.number = config.runner_ui.show_nu
@@ -34,21 +34,24 @@ function M.init_ui(windows, config, init_winid)
 	settings.eo = vim.deepcopy(split_settings)
 
 	---Get first windows in the given layout
-	---@param layout table: layout description
-	---@return string: first window name
+	---@param layout competitest.RunnerUI.layout | competitest.RunnerUI.layout.window
+	---@return competitest.RunnerUI.standard_window # first window name
 	local function get_first_window(layout)
-		if type(layout[1]) == "table" then -- a list of windows doesn't have number as first element
+		if type(layout[1]) == "table" then -- a layout doesn't have number as first element
+			---@diagnostic disable-next-line: param-type-mismatch
 			return get_first_window(layout[1])
 		elseif type(layout[2]) == "table" then
+			---@diagnostic disable-next-line: param-type-mismatch
 			return get_first_window(layout[2])
 		end
+		---@diagnostic disable-next-line: return-type-mismatch
 		return layout[2]
 	end
 
 	---Recursively compute split layout
-	---@param layout table: layout description
-	---@param winid integer: starting window id
-	---@param vertical boolean: whether to proceed vertically or horizontally
+	---@param layout competitest.RunnerUI.layout
+	---@param winid integer starting window id
+	---@param vertical boolean whether to proceed vertically or horizontally
 	local function create_layout(layout, winid, vertical)
 		local dimension = vertical and "height" or "width"
 		local total_width = vim.api["nvim_win_get_" .. dimension](winid)
@@ -86,6 +89,7 @@ function M.init_ui(windows, config, init_winid)
 
 		for i, l in ipairs(layout) do
 			if type(l[2]) == "table" then
+				---@diagnostic disable-next-line: param-type-mismatch
 				create_layout(l[2], windows_id[i], not vertical)
 			end
 		end

@@ -1,17 +1,20 @@
 local utils = require("competitest.utils")
 local M = {}
 
--- Methods to determine if result is correct
--- They accepts two arguments, output and expected output
--- A boolean value is returned, true if the output is acceptable, false otherwise
+---@alias competitest.Compare.method fun(output: string, expected_output: string): boolean function accepting two string arguments, `output` and `expected_output`, and returning `true` if and only if `output` is correct
+
+---@alias competitest.Compare.builtin_method # builtin method to compare output and expected output
+---| "exact" character-by-character comparison
+---| "squish" compare stripping duplicated or extra white spaces and newlines
+
+---Builtin methods to compare output and expected output
+---@type table<competitest.Compare.builtin_method, competitest.Compare.method>
 M.methods = {
-	-- exact: byte-byte comparison
-	["exact"] = function(output, expout)
+	exact = function(output, expout)
 		return output == expout
 	end,
 
-	-- squish: ignore duplicates newlines and spaces when comparing
-	["squish"] = function(output, expout)
+	squish = function(output, expout)
 		local function squish_string(str)
 			str = string.gsub(str, "\n", " ")
 			str = string.gsub(str, "%s+", " ")
@@ -26,10 +29,10 @@ M.methods = {
 }
 
 ---Compare output and expected output to determine if they can match
----@param output string: program's output
----@param expected_output string | nil: expected result, or nil when it isn't provided
----@param method string | function: can be "exact", "squish" or a custom function that receives two arguments
----@return boolean | nil: true if output matches expected output. Returns nil if there's no expected output to compare
+---@param output string program output
+---@param expected_output string? expected result, or `nil` when it isn't provided
+---@param method competitest.Compare.builtin_method | competitest.Compare.method
+---@return boolean? # `true` if output matches expected output, `false` if they don't match, `nil` if `expected_output` is `nil`
 function M.compare_output(output, expected_output, method)
 	if expected_output == nil then
 		return nil

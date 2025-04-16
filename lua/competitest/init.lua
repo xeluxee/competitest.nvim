@@ -1,13 +1,14 @@
 local config = require("competitest.config")
+local competitest_loaded = false
 local M = {}
 
 ---Setup CompetiTest
----@param opts table | nil: a table containing user configuration
+---@param opts competitest.Config? CompetiTest configuration provided by user
 function M.setup(opts)
 	config.current_setup = config.update_config_table(config.current_setup, opts)
 
-	if not config.current_setup.loaded then
-		config.current_setup.loaded = true
+	if not competitest_loaded then
+		competitest_loaded = true
 
 		-- CompetiTest command
 		vim.cmd([[

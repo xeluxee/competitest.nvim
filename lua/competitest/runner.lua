@@ -1,55 +1,146 @@
 local api = vim.api
-local luv = vim.loop
+local luv = vim.uv and vim.uv or vim.loop
 local config = require("competitest.config")
 local utils = require("competitest.utils")
 local ui = require("competitest.runner_ui")
 
-local TCRunner = {}
-TCRunner.__index = TCRunner
+---System command with arguments
+---@class (exact) competitest.SystemCommand
+---@field exec string executable path
+---@field args string[]? program arguments
 
----Create a new Testcase Runner
----@param bufnr integer: buffer number that specify the buffer to associate the runner with
----@return object: a new TCRunner object, or nil on failure
+---Running testcase process status
+---@class (exact) competitest.TCRunner.testcase_status.process
+---@field cmd competitest.SystemCommand
+---@field stdin uv.uv_pipe_t
+---@field stdout uv.uv_pipe_t
+---@field stderr uv.uv_pipe_t
+---@field handle uv.uv_process_t
+---@field pid integer
+---@field starting_time integer
+
+---Running testcase status, data and results
+---@class (exact) competitest.TCRunner.testcase_status
+---@field stdin string[] stdin lines
+---@field expout string[]? expected output lines
+---@field stdout string[] stdout lines
+---@field stderr string[] stderr lines
+---@field tcnum integer | string testcase number or identifier
+---@field status "" | "RUNNING" | "TIMEOUT" | "KILLED" | "SIG x" | "RET x" | "FAILED" | "CORRECT" | "WRONG" | "DONE"
+---@field hlgroup string testcase status highlight group
+---@field timelimit integer? maximum execution time in milliseconds, or `nil` if there's no time limit
+---@field timer uv.uv_timer_t? process is killed when `timer` expires, `nil` if and only if `timelimit` is `nil`
+---@field time integer? testcase running time in milliseconds, `nil` if process isn't started or is running
+---@field process competitest.TCRunner.testcase_status.process
+---@field running boolean
+---@field killed boolean
+---@field exit_code integer?
+---@field exit_signal integer?
+
+---Testcases Runner
+---@class (exact) competitest.TCRunner
+---@field config competitest.Config buffer configuration
+---@field private bufnr integer associated buffer
+---@field private cc competitest.SystemCommand? compile command, or `nil` for interpreted languages
+---@field private rc competitest.SystemCommand run command
+---@field private compile_directory string
+---@field private running_directory string
+---@field tcdata table<integer, competitest.TCRunner.testcase_status> testcases status, data and results
+---@field private compile boolean whether compilation is needed in the current run or not
+---@field private next_tc integer index of next unprocessed testcase to run
+---@field restore_winid integer? bring the cursor to the given window when testcases runner UI is closed
+---@field private ui competitest.RunnerUI?
+local TCRunner = {}
+TCRunner.__index = TCRunner ---@diagnostic disable-line: inject-field
+
+---Create a new `TCRunner`
+---@param bufnr integer buffer to associate the runner with
+---@return competitest.TCRunner? # a new `TCRunner`, or `nil` on failure
 function TCRunner:new(bufnr)
-	local filetype = api.nvim_buf_get_option(bufnr, "filetype")
+	local filetype = vim.bo[bufnr].filetype
 	local filedir = api.nvim_buf_call(bufnr, function()
 		return vim.fn.expand("%:p:h")
 	end) .. "/"
 
+	---Evaluate CompetiTest file-format modifiers inside a system command
+	---@param command competitest.SystemCommand
+	---@return competitest.SystemCommand?
 	local function eval_command(command)
-		if command == nil then
+		local exec = utils.buf_eval_string(bufnr, command.exec, nil)
+		if not exec then
 			return nil
 		end
-		local exec = utils.buf_eval_string(bufnr, command.exec, nil)
+		---@type string[]
 		local args = {}
 		for index, arg in ipairs(command.args or {}) do
 			args[index] = utils.buf_eval_string(bufnr, arg, nil)
+			if not args[index] then
+				return nil
+			end
 		end
 		return { exec = exec, args = args }
 	end
 
 	local buf_cfg = config.get_buffer_config(bufnr)
-	local this = {
-		config = buf_cfg,
-		bufnr = bufnr,
-		cc = eval_command(buf_cfg.compile_command[filetype]), -- compile command
-		rc = eval_command(buf_cfg.run_command[filetype]), -- run command
-		compile_directory = filedir .. buf_cfg.compile_directory .. "/",
-		running_directory = filedir .. buf_cfg.running_directory .. "/",
-		testcase_directory = filedir .. buf_cfg.testcases_directory .. "/",
-	}
-	if this.rc == nil then
+	local compile_command = nil
+	if buf_cfg.compile_command[filetype] then
+		compile_command = eval_command(buf_cfg.compile_command[filetype])
+		if not compile_command then
+			utils.notify("TCRunner:new: compile command for filetype '" .. filetype .. "' isn't formatted properly.\nCannot proceed.")
+			return nil
+		end
+	end
+	if not buf_cfg.run_command[filetype] then
 		utils.notify("TCRunner:new: run command for filetype '" .. filetype .. "' isn't configured properly.\nCannot proceed.")
 		return nil
 	end
+	local run_command = eval_command(buf_cfg.run_command[filetype])
+	if not run_command then
+		utils.notify("TCRunner:new: run command for filetype '" .. filetype .. "' isn't formatted properly.\nCannot proceed.")
+		return nil
+	end
 
+	---@type competitest.TCRunner
+	local this = {
+		config = buf_cfg,
+		bufnr = bufnr,
+		cc = compile_command,
+		rc = run_command,
+		compile_directory = filedir .. buf_cfg.compile_directory .. "/",
+		running_directory = filedir .. buf_cfg.running_directory .. "/",
+		tcdata = {},
+		compile = compile_command ~= nil,
+		next_tc = 1,
+	}
 	setmetatable(this, self)
 	return this
 end
 
----Run the testcases specified in self.tcdata
----@param tctbl table | nil: table associating testcase numbers to file names
----@param compile boolean | nil: whether to compile or not
+---Run the `tcindex`-th testcase
+---@param tcindex integer testcase index in `self.tcdata`
+function TCRunner:run_testcase(tcindex)
+	if tcindex == 1 and self.compile then
+		self:execute_testcase(tcindex, self.cc, self.compile_directory)
+	else
+		self:execute_testcase(tcindex, self.rc, self.running_directory)
+	end
+end
+
+---@private
+---Run the next unprocessed testcase, if any, and when it finishes run the successive unprocessed testcase, if any
+function TCRunner:run_next_testcase()
+	if self.next_tc > #self.tcdata then
+		return
+	end
+	self.next_tc = self.next_tc + 1
+	self:execute_testcase(self.next_tc - 1, self.rc, self.running_directory, function()
+		self:run_next_testcase()
+	end)
+end
+
+---Run new testcases or previously loaded ones
+---@param tctbl competitest.TcTable? testcases to run, or `nil` to run previously loaded testcases
+---@param compile boolean? whether to compile or not, `nil` has the same effect as `true`
 function TCRunner:run_testcases(tctbl, compile)
 	if tctbl then -- if tctbl isn't specified use the testcases that were previously loaded
 		if self.config.save_all_files then
@@ -60,7 +151,7 @@ function TCRunner:run_testcases(tctbl, compile)
 			end)
 		end
 
-		self.tcdata = {} -- table containing data about testcases and results
+		self.tcdata = {}
 		if compile == nil then -- if not specified compile
 			compile = true
 		end
@@ -71,7 +162,6 @@ function TCRunner:run_testcases(tctbl, compile)
 		for tcnum, tc in pairs(tctbl) do
 			table.insert(self.tcdata, {
 				stdin = vim.split(tc.input, "\n", { plain = true }),
-				-- expout = expected output, can be table or nil
 				expout = tc.output and vim.split(tc.output, "\n", { plain = true }),
 				tcnum = tcnum,
 				timelimit = self.config.maximum_time,
@@ -95,7 +185,7 @@ function TCRunner:run_testcases(tctbl, compile)
 	if mut == -1 then -- -1 -> make the most of the amount of available parallelism
 		if luv.available_parallelism then
 			mut = luv.available_parallelism()
-		else -- vim.loop.available_parallelism() isn't available in Neovim < 0.7.2
+		else -- luv.available_parallelism() isn't available in Neovim < 0.7.2
 			local cpu_info = luv.cpu_info()
 			mut = cpu_info and #cpu_info or 1
 		end
@@ -103,65 +193,52 @@ function TCRunner:run_testcases(tctbl, compile)
 		mut = tc_size
 	end
 	mut = math.min(tc_size, mut)
-	local next_tc = 1
-
-	function self.run_next_tc(tcnum)
-		if tcnum then
-			if tcnum == 1 and self.compile then
-				self:execute_testcase(tcnum, self.cc.exec, self.cc.args, self.compile_directory)
-			else
-				self:execute_testcase(tcnum, self.rc.exec, self.rc.args, self.running_directory)
-			end
-			return
-		end
-		if next_tc > tc_size then
-			return
-		end
-		next_tc = next_tc + 1
-		self:execute_testcase(next_tc - 1, self.rc.exec, self.rc.args, self.running_directory, self.run_next_tc)
-	end
+	self.next_tc = 1
 
 	local function run_first_testcases()
-		local starting_tc = next_tc
-		next_tc = next_tc + mut
+		local starting_tc = self.next_tc
+		self.next_tc = self.next_tc + mut
 		for tcnum = starting_tc, math.min(tc_size, starting_tc + mut - 1) do
-			self:execute_testcase(tcnum, self.rc.exec, self.rc.args, self.running_directory, self.run_next_tc)
+			self:execute_testcase(tcnum, self.rc, self.running_directory, function()
+				self:run_next_testcase()
+			end)
 		end
 	end
 
 	if not self.compile then
 		run_first_testcases()
 	else
-		next_tc = 2
+		self.next_tc = 2
 		local function compilation_callback()
 			if self.tcdata[1].exit_code == 0 then
 				run_first_testcases()
 			end
 		end
-
-		self:execute_testcase(1, self.cc.exec, self.cc.args, self.compile_directory, compilation_callback)
+		self:execute_testcase(1, self.cc, self.compile_directory, compilation_callback)
 	end
 end
 
+---@private
 ---Start a testcase process with given parameters
----@param tcindex integer: testcase index, refer to self.tcdata
----@param exec string: name of executable
----@param args table: array of its arguments
----@param dir string: current working directory
----@param callback function | nil: callback function
-function TCRunner:execute_testcase(tcindex, exec, args, dir, callback)
+---@param tcindex integer testcase index in `self.tcdata`
+---@param cmd competitest.SystemCommand command to run testcase
+---@param dir string current working directory
+---@param callback fun()? callback function
+function TCRunner:execute_testcase(tcindex, cmd, dir, callback)
+	---@type competitest.TCRunner.testcase_status.process
+	---@diagnostic disable-next-line: missing-fields
 	local process = {
-		exec = exec,
-		args = args,
-		stdin = luv.new_pipe(false),
-		stdout = luv.new_pipe(false),
-		stderr = luv.new_pipe(false),
+		cmd = cmd,
+		stdin = assert(luv.new_pipe(false), "CompetiTest.nvim: TCRunner:execute_testcase: process stdin pipe creation failed"),
+		stdout = assert(luv.new_pipe(false), "CompetiTest.nvim: TCRunner:execute_testcase: process stdout pipe creation failed"),
+		stderr = assert(luv.new_pipe(false), "CompetiTest.nvim: TCRunner:execute_testcase: process stderr pipe creation failed"),
 	}
 	local tc = self.tcdata[tcindex]
 
 	utils.create_directory(dir)
-	process.handle, process.pid = luv.spawn(process.exec, {
-		args = process.args,
+	---@diagnostic disable-next-line: missing-fields
+	process.handle, process.pid = luv.spawn(process.cmd.exec, {
+		args = process.cmd.args,
 		cwd = dir,
 		stdio = { process.stdin, process.stdout, process.stderr },
 	}, function(code, signal)
@@ -202,7 +279,7 @@ function TCRunner:execute_testcase(tcindex, exec, args, dir, callback)
 		end
 	end)
 	if not process.handle then
-		utils.notify("TCRunner:execute_testcase: failed to spawn process using '" .. process.exec .. "' (" .. process.pid .. ").")
+		utils.notify("TCRunner:execute_testcase: failed to spawn process using '" .. process.cmd.exec .. "' (" .. process.pid .. ").")
 		tc.status = "FAILED"
 		tc.hlgroup = "CompetiTestWarning"
 		tc.time = -1
@@ -211,7 +288,7 @@ function TCRunner:execute_testcase(tcindex, exec, args, dir, callback)
 	end
 
 	---Update array of lines with data received from stdout or stderr
-	---@param lines table
+	---@param lines string[]
 	---@param received string
 	local function add_stream_lines(lines, received)
 		local received_lines = vim.split(string.gsub(received, "\r\n", "\n"), "\n", { plain = true })
@@ -265,7 +342,7 @@ function TCRunner:execute_testcase(tcindex, exec, args, dir, callback)
 	end)
 
 	if tc.timelimit then
-		tc.timer = luv.new_timer()
+		tc.timer = assert(luv.new_timer(), "CompetiTest.nvim: TCRunner:execute_testcase: timer creation failed")
 		tc.timer:start(tc.timelimit, 0, function()
 			tc.timer:stop()
 			tc.timer:close()
@@ -284,8 +361,8 @@ function TCRunner:execute_testcase(tcindex, exec, args, dir, callback)
 	self:update_ui(true)
 end
 
----Kill the process associated with a testcase
----@param tcindex integer: testcase index
+---Kill the process associated with a testcase, triggering the execution of the next unprocessed testcase, if any
+---@param tcindex integer testcase index in `self.tcdata`
 function TCRunner:kill_process(tcindex)
 	local tc = self.tcdata[tcindex]
 	if tc.running ~= true then
@@ -300,7 +377,7 @@ function TCRunner:kill_process(tcindex)
 	tc.killed = true
 end
 
----Kill all the running processes associated with testcases
+---Kill all the running processes associated with testcases, triggering the execution of the next unprocessed testcases, if any
 function TCRunner:kill_all_processes()
 	if self.tcdata then
 		for tcindex, _ in pairs(self.tcdata) do
@@ -321,17 +398,18 @@ function TCRunner:show_ui()
 	self.ui:update_ui()
 end
 
----Set or update restore_winid
----@param winid integer: bring the cursor to the given window after runner is closed
-function TCRunner:set_restore_winid(winid)
-	self.restore_winid = winid
+---Set or update `restore_winid`
+---@param restore_winid integer bring the cursor to the given window after runner is closed
+function TCRunner:set_restore_winid(restore_winid)
+	self.restore_winid = restore_winid
 	if self.ui then
-		self.ui.restore_winid = winid
+		self.ui.restore_winid = restore_winid
 	end
 end
 
+---@private
 ---Update Runner UI content
----@param update_windows boolean | nil: whether to update all the windows or only details windows
+---@param update_windows boolean? whether to update all the windows or details window only, `nil` has the same effect as `false`
 function TCRunner:update_ui(update_windows)
 	if self.ui then
 		if update_windows then -- avoid direct assignment to satisfy unprocessed previous update_windows requests
