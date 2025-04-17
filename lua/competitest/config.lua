@@ -25,7 +25,6 @@
 ---@field height number ratio between viewer popup height and Neovim height (between 0 and 1)
 ---@field show_nu boolean show lines number
 ---@field show_rnu boolean show lines relative number
----@field close_mappings keymaps mappings to close viewer popup
 
 ---Runner UI options
 ---@class (exact) competitest.Config.runner_ui
@@ -151,7 +150,6 @@ local default_config = {
 			height = 0.5,
 			show_nu = true,
 			show_rnu = false,
-			close_mappings = { "q", "Q" },
 		},
 	},
 	popup_ui = {
@@ -256,14 +254,16 @@ function M.update_config_table(cfg_tbl, opts)
 		return vim.deepcopy(cfg_tbl or default_config)
 	end
 
-	--[[
 	-- check deprecated options
 	local function notify_warning(msg)
 		vim.schedule(function()
 			vim.notify("CompetiTest.nvim: " .. msg, vim.log.levels.WARN, { title = "CompetiTest" })
 		end)
 	end
-	]]
+	---@diagnostic disable-next-line: undefined-field
+	if opts.runner_ui and opts.runner_ui.viewer and opts.runner_ui.viewer.close_mappings then
+		notify_warning("option 'runner_ui.viewer.close_mappings' is deprecated.\nPlease use 'runner_ui.mappings.close' instead.")
+	end
 
 	local new_config = vim.tbl_deep_extend("force", cfg_tbl or default_config, opts)
 	-- commands arguments lists need to be replaced and not extended

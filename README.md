@@ -256,7 +256,6 @@ require('competitest').setup {
 			height = 0.5,
 			show_nu = true,
 			show_rnu = false,
-			close_mappings = { "q", "Q" },
 		},
 	},
 	popup_ui = {
@@ -371,7 +370,6 @@ require('competitest').setup {
 		- `height`: a value from 0 to 1, representing the ratio between viewer window height and Neovim height
 		- `show_nu`: whether to show line numbers or not in viewer window
 		- `show_rnu`: whether to show relative line numbers or not in viewer window
-		- `close_mappings`: keymaps to close viewer window
 - `popup_ui`: settings related to testcase runner popup interface
 	- `total_width`: a value from 0 to 1, representing the ratio between total interface width and Neovim width
 	- `total_height`: a value from 0 to 1, representing the ratio between total interface height and Neovim height
