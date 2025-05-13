@@ -1,8 +1,6 @@
 local api = vim.api
 local luv = vim.uv and vim.uv or vim.loop
-local config = require("competitest.config")
 local utils = require("competitest.utils")
-local ui = require("competitest.runner_ui")
 
 ---System command with arguments
 ---@class (exact) competitest.SystemCommand
@@ -11,7 +9,6 @@ local ui = require("competitest.runner_ui")
 
 ---Running testcase process status
 ---@class (exact) competitest.TCRunner.testcase_status.process
----@field cmd competitest.SystemCommand
 ---@field stdin uv.uv_pipe_t
 ---@field stdout uv.uv_pipe_t
 ---@field stderr uv.uv_pipe_t
@@ -25,7 +22,7 @@ local ui = require("competitest.runner_ui")
 ---@field expout string[]? expected output lines
 ---@field stdout string[] stdout lines
 ---@field stderr string[] stderr lines
----@field tcnum integer | string testcase number or identifier
+---@field tcnum integer | "Compile" testcase number or identifier
 ---@field status "" | "RUNNING" | "TIMEOUT" | "KILLED" | "SIG x" | "RET x" | "FAILED" | "CORRECT" | "WRONG" | "DONE"
 ---@field hlgroup string testcase status highlight group
 ---@field timelimit integer? maximum execution time in milliseconds, or `nil` if there's no time limit
@@ -48,7 +45,7 @@ local ui = require("competitest.runner_ui")
 ---@field tcdata table<integer, competitest.TCRunner.testcase_status> testcases status, data and results
 ---@field private compile boolean whether compilation is needed in the current run or not
 ---@field private next_tc integer index of next unprocessed testcase to run
----@field restore_winid integer? bring the cursor to the given window when testcases runner UI is closed
+---@field ui_restore_winid integer? bring the cursor to the given window when testcases runner UI is closed
 ---@field private ui competitest.RunnerUI?
 local TCRunner = {}
 TCRunner.__index = TCRunner ---@diagnostic disable-line: inject-field
@@ -81,7 +78,7 @@ function TCRunner:new(bufnr)
 		return { exec = exec, args = args }
 	end
 
-	local buf_cfg = config.get_buffer_config(bufnr)
+	local buf_cfg = require("competitest.config").get_buffer_config(bufnr)
 	local compile_command = nil
 	if buf_cfg.compile_command[filetype] then
 		compile_command = eval_command(buf_cfg.compile_command[filetype])
@@ -228,7 +225,6 @@ function TCRunner:execute_testcase(tcindex, cmd, dir, callback)
 	---@type competitest.TCRunner.testcase_status.process
 	---@diagnostic disable-next-line: missing-fields
 	local process = {
-		cmd = cmd,
 		stdin = assert(luv.new_pipe(false), "CompetiTest.nvim: TCRunner:execute_testcase: process stdin pipe creation failed"),
 		stdout = assert(luv.new_pipe(false), "CompetiTest.nvim: TCRunner:execute_testcase: process stdout pipe creation failed"),
 		stderr = assert(luv.new_pipe(false), "CompetiTest.nvim: TCRunner:execute_testcase: process stderr pipe creation failed"),
@@ -237,8 +233,8 @@ function TCRunner:execute_testcase(tcindex, cmd, dir, callback)
 
 	utils.create_directory(dir)
 	---@diagnostic disable-next-line: missing-fields
-	process.handle, process.pid = luv.spawn(process.cmd.exec, {
-		args = process.cmd.args,
+	process.handle, process.pid = luv.spawn(cmd.exec, {
+		args = cmd.args,
 		cwd = dir,
 		stdio = { process.stdin, process.stdout, process.stderr },
 	}, function(code, signal)
@@ -279,7 +275,7 @@ function TCRunner:execute_testcase(tcindex, cmd, dir, callback)
 		end
 	end)
 	if not process.handle then
-		utils.notify("TCRunner:execute_testcase: failed to spawn process using '" .. process.cmd.exec .. "' (" .. process.pid .. ").")
+		utils.notify("TCRunner:execute_testcase: failed to spawn process using '" .. cmd.exec .. "' (" .. process.pid .. ").")
 		tc.status = "FAILED"
 		tc.hlgroup = "CompetiTestWarning"
 		tc.time = -1
@@ -358,6 +354,8 @@ function TCRunner:execute_testcase(tcindex, cmd, dir, callback)
 	tc.hlgroup = "CompetiTestRunning"
 	tc.running = true
 	tc.killed = false
+	tc.exit_code = nil
+	tc.exit_signal = nil
 	self:update_ui(true)
 end
 
@@ -392,7 +390,7 @@ function TCRunner:show_ui()
 		return
 	end
 	if not self.ui then
-		self.ui = ui:new(self)
+		self.ui = require("competitest.runner_ui"):new(self)
 	end
 	self.ui:show_ui()
 	self.ui:update_ui()
@@ -401,7 +399,7 @@ end
 ---Set or update `restore_winid`
 ---@param restore_winid integer bring the cursor to the given window after runner is closed
 function TCRunner:set_restore_winid(restore_winid)
-	self.restore_winid = restore_winid
+	self.ui_restore_winid = restore_winid
 	if self.ui then
 		self.ui.restore_winid = restore_winid
 	end

@@ -58,6 +58,7 @@ local utils = require("competitest.utils")
 ---@field private windows competitest.RunnerUI.windows_table
 ---@field private interface competitest.RunnerUI.interface
 ---@field private make_viewer_visible boolean one-time request for `self:update_ui()` to open viewer after updating details
+---@field private latest_compilation_timestamp integer? latest failed compilation process start timestamp, used to decide whether to automatically show compilation errors in viewer popup or not
 local RunnerUI = {}
 RunnerUI.__index = RunnerUI ---@diagnostic disable-line: inject-field
 
@@ -85,7 +86,7 @@ function RunnerUI:new(runner)
 		viewer_visible = false,
 		viewer_content = nil,
 		diff_view = runner.config.view_output_diff,
-		restore_winid = runner.restore_winid,
+		restore_winid = runner.ui_restore_winid,
 		update_details = false,
 		update_windows = false,
 		update_testcase = nil,
@@ -432,8 +433,29 @@ function RunnerUI:update_ui()
 
 			for tcindex, data in ipairs(self.runner.tcdata) do
 				local l = { header = "TC " .. data.tcnum, status = data.status, time = "" }
-				if type(data.tcnum) == "string" then
+				if data.tcnum == "Compile" then
 					l.header = data.tcnum
+					-- open viewer popup showing compilation errors when compilation fails
+					if
+						self.runner.config.runner_ui.viewer.open_when_compilation_fails
+						and not data.killed
+						and data.exit_code
+						and data.exit_code ~= 0
+						and data.process.starting_time ~= self.latest_compilation_timestamp
+					then
+						if api.nvim_win_get_cursor(self.windows.tc.winid)[1] == 1 then
+							self.update_testcase = 1
+							self.viewer_content = "se"
+							self.make_viewer_visible = true
+							self.latest_compilation_timestamp = data.process.starting_time
+						else
+							-- move cursor to "Compile" line if not already there, then self:update_ui() will be triggered by CursorMoved event
+							self.update_testcase = nil
+							self.update_windows = true
+							api.nvim_win_set_cursor(self.windows.tc.winid, { 1, 0 })
+							return
+						end
+					end
 				end
 				if data.time and data.time ~= -1 then
 					l.time = string.format("%.3f seconds", data.time / 1000)

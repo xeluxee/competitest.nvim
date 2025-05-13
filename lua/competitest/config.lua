@@ -25,6 +25,7 @@
 ---@field height number ratio between viewer popup height and Neovim height (between 0 and 1)
 ---@field show_nu boolean show lines number
 ---@field show_rnu boolean show lines relative number
+---@field open_when_compilation_fails boolean open viewer popup showing compilation errors when compilation fails
 
 ---Runner UI options
 ---@class (exact) competitest.Config.runner_ui
@@ -150,6 +151,7 @@ local default_config = {
 			height = 0.5,
 			show_nu = true,
 			show_rnu = false,
+			open_when_compilation_fails = true,
 		},
 	},
 	popup_ui = {
