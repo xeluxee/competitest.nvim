@@ -201,6 +201,7 @@ local default_config = {
 	save_current_file = true,
 	save_all_files = false,
 	compile_directory = ".",
+	remove_compiled_binary = false,
 	compile_command = {
 		c = { exec = "gcc", args = { "-Wall", "$(FNAME)", "-o", "$(FNOEXT)" } },
 		cpp = { exec = "g++", args = { "-Wall", "$(FNAME)", "-o", "$(FNOEXT)" } },

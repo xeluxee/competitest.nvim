@@ -192,6 +192,57 @@ function TCRunner:run_testcases(tctbl, compile)
 	mut = math.min(tc_size, mut)
 	self.next_tc = 1
 
+	local function rmdir(dir)
+		local d = luv.fs_opendir(dir)
+		if d then
+			while true do
+				local content = luv.fs_readdir(d, nil, 1)
+				if not content then
+					break
+				end
+				for _, entry in ipairs(content) do
+					if entry.name ~= "." or entry.name ~= ".." then
+						local path = dir .. "/" .. entry.name
+						if entry.type == 'directory' then
+							rmdir(path)
+						elseif entry.type == 'file' then
+							luv.fs_unlink(path)
+						end
+					end
+				end
+			end
+			luv.fs_closedir(d)
+		end
+		luv.fs_rmdir(dir)
+	end
+
+	function self.run_next_tc(tcnum)
+		if tcnum then
+			if tcnum == 1 and self.compile then
+				self:execute_testcase(tcnum, self.cc.exec, self.cc.args, self.compile_directory)
+			else
+				self:execute_testcase(tcnum, self.rc.exec, self.rc.args, self.running_directory)
+			end
+			return
+		end
+		if next_tc > tc_size then
+			local sep = vim.fn.has("win32") and "\\" or "/"
+			local rc_exec = self.running_directory .. sep .. self.rc.exec
+			if self.compile and self.config.remove_compiled_binary and vim.fn.filereadable(rc_exec) then
+				os.remove(rc_exec)
+				if vim.fn.has("mac") then
+					local dsym = rc_exec .. ".dSYM"
+					if vim.fn.isdirectory(dsym) then
+						rmdir(dsym)
+					end
+				end
+			end
+			return
+		end
+		next_tc = next_tc + 1
+		self:execute_testcase(next_tc - 1, self.rc.exec, self.rc.args, self.running_directory, self.run_next_tc)
+	end
+
 	local function run_first_testcases()
 		local starting_tc = self.next_tc
 		self.next_tc = self.next_tc + mut
